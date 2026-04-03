@@ -452,3 +452,64 @@ input[type="text"] {
     margin: 0.5rem 0;
 }
 
+/* Language Selector / Google Translate Widget Styles */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#google_translate_element {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.3rem 0.6rem;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    transition: border-color 0.3s;
+}
+
+#google_translate_element:hover {
+    border-color: var(--primary);
+}
+
+.goog-te-gadget-simple {
+    background-color: transparent !important;
+    border: none !important;
+    font-family: inherit !important;
+    font-size: 0.85rem !important;
+}
+
+.goog-te-gadget-simple span {
+    color: var(--primary) !important;
+    font-weight: 500;
+}
+
+.goog-te-banner-frame.skiptranslate, .goog-te-balloon-frame.skiptranslate {
+    display: none !important;
+}
+
+body {
+    top: 0px !important;
+}
+
+/* Speak Icon in Chat */
+.speak-icon {
+    font-size: 1rem;
+    cursor: pointer;
+    margin-left: 0.8rem;
+    opacity: 0.6;
+    transition: all 0.2s;
+    vertical-align: middle;
+}
+
+.speak-icon:hover {
+    opacity: 1;
+    color: var(--primary);
+    transform: scale(1.2);
+}
+
+.alert-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+

@@ -31,7 +31,7 @@ const systemInstruction = `You are Agri-AI, the expert digital assistant for the
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const geminiModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
     systemInstruction: systemInstruction
 });
 
@@ -93,6 +93,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
         const prompt = `
         CONTEXT: The plant is located in ${locationName}. 
+        REQUESTED LANGUAGE: ${req.body.language || "English"}.
         Analyze this crop image and provide:
         1. Disease identification (single name).
         2. Description of the issue.
@@ -102,6 +103,8 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
         6. A specific 'spray' recommendation.
         7. The 'action time' for the spray (e.g., Early morning, Evening).
         8. The 'quantity' of spray to use (e.g., 2 ml/liter of water).
+        
+        INSTRUCTION: You MUST return all text fields (disease, description, treatment, spray, etc.) in the requested language (${req.body.language}).
         Format your response as a valid JSON object ONLY:
         {
             "disease": "string",
@@ -203,8 +206,11 @@ app.post("/chat", async (req, res) => {
         ${contextKnowledge}
         
         USER QUESTION: ${question}
+        REQUESTED LANGUAGE: ${req.body.language || "English"}
         
-        INSTRUCTION: Answer the user's question based on their history if relevant. If you mention any chemicals or treatments, ensure they are real and effective for the diseases listed above.`;
+        INSTRUCTION: Answer the user's question based on their history if relevant. 
+        MANDATORY: You MUST respond entirely in the requested language (${req.body.language}). 
+        If you mention any chemicals or treatments, ensure they are real and effective for the diseases listed above.`;
 
         // 3. Request completion using history
         const messages = [

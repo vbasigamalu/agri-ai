@@ -75,7 +75,7 @@ analyzeBtn.addEventListener("click", async () => {
         formData.append("image", file);
         formData.append("lat", lat);
         formData.append("lon", lon);
-        formData.append("locationName", locName); // Send location name to backend too
+        formData.append("locationName", locName); 
 
         try {
             const response = await fetch(`${API_BASE_URL}/analyze`, {

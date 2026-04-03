@@ -34,7 +34,10 @@
     <div id="mainContent" class="hidden">
         <div class="header-row">
             <h2>🌾 Smart Agro Advisor</h2>
-            <button id="logoutBtn" class="small-btn">Logout</button>
+            <div class="header-controls">
+                <div id="google_translate_element"></div>
+                <button id="logoutBtn" class="small-btn">Logout</button>
+            </div>
         </div>
 
         <div class="upload-section">
@@ -135,6 +138,20 @@
 </div>
 
 <script src="script.js"></script>
+
+<!-- Text-to-Speech Engine -->
+<script src="https://code.responsivevoice.org/responsivevoice.js?key=f0uO5YlA"></script>
+
+<!-- Google Translate Widget Implementation -->
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({
+      pageLanguage: 'en',
+      autoDisplay: true
+  }, 'google_translate_element');
+}
+</script>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 <script>
     // Simple UI feedback for file selection and preview

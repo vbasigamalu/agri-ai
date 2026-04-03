@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌾 Agri-AI | Smart Crop Advisor</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+
+</head>
+<body>
+
+<div class="container">
+    <!-- Login Section -->
+    <div id="loginSection">
+        <h2>👨‍🌾 Farmer Login</h2>
+        <div class="login-form">
+            <div class="input-group">
+                <label for="username">Farmer ID / Phone</label>
+                <input type="text" id="username" placeholder="Enter your ID">
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••">
+            </div>
+            <button type="button" id="loginBtn">Access Advisor</button>
+
+            <p id="loginError" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- Main Content (Hidden by default) -->
+    <div id="mainContent" class="hidden">
+        <div class="header-row">
+            <h2>🌾 Smart Agro Advisor</h2>
+            <button id="logoutBtn" class="small-btn">Logout</button>
+        </div>
+
+        <div class="upload-section">
+            <label class="upload-label" id="fileLabel" for="imageInput">
+                📸 Click or drag <span>Crop Image</span> to upload
+            </label>
+            <input type="file" id="imageInput" accept="image/*" capture="camera" hidden>
+            <div id="imagePreviewContainer" class="hidden">
+                <img id="imagePreview" src="" alt="Crop Preview">
+            </div>
+        </div>
+
+        <button type="button" id="analyzeBtn">Analyze Crop Conditions</button>
+
+        <p id="statusMsg"></p>
+
+        <div class="results">
+            <div class="result-card full-width">
+                <p>📍 Detection Location</p>
+                <div class="location-row">
+                    <span id="locationName">---</span>
+                    <button id="changeLocBtn" class="mini-btn">Change</button>
+                </div>
+            </div>
+            <div class="result-card full-width">
+                <p>🦠 Predicted Disease</p>
+                <span id="disease">---</span>
+            </div>
+            <div class="result-card full-width spray-decision">
+                <p>🔫 Spray Decision</p>
+                <span id="sprayDecision">---</span>
+            </div>
+            <div class="result-card">
+                <p>⏱️ Spray Timing</p>
+                <span id="sprayActionTime">---</span>
+            </div>
+            <div class="result-card">
+                <p>💧 Spray Quantity</p>
+                <span id="sprayQuantity">---</span>
+            </div>
+            <div class="result-card">
+                <p>🎯 Confidence</p>
+                <span id="confidence">---</span>
+            </div>
+            <div class="result-card">
+                <p>📊 Severity</p>
+                <span id="severity">---</span>
+            </div>
+            <div class="result-card">
+                <p>🌡️ Temperature</p>
+                <span id="temperature">---</span>
+            </div>
+            <div class="result-card">
+                <p>💧 Humidity</p>
+                <span id="humidity">---</span>
+            </div>
+            <div class="result-card full-width">
+                <p>⚠ Analysis Alert</p>
+                <span id="alert">-- No analysis run --</span>
+            </div>
+        </div>
+
+        <div class="advice-section">
+            <h3>🌱 Expert Advice</h3>
+            <ul id="adviceList">
+                <li>Upload image for advice</li>
+            </ul>
+        </div>
+
+        <!-- Chatbot Section -->
+        <div class="chat-section">
+            <h3>💬 Ask Agri-Advisor</h3>
+            <div class="chat-box" id="chatBox">
+                <div class="message bot-msg">Hello! I'm your AI Agricultural Assistant. After analyzing your crop, feel free to ask me for detailed treatment steps or any farming questions!</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chatInput" placeholder="Ask about treatment, soil, seeds...">
+                <button type="button" id="sendChatBtn" class="send-btn">Send</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+
+<script>
+    // Simple UI feedback for file selection and preview
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // UI label update
+        document.getElementById('fileLabel').innerHTML = `✅ Selected: <span>${file.name}</span>`;
+
+        // Image Preview logic
+        const preview = document.getElementById('imagePreview');
+        const previewContainer = document.getElementById('imagePreviewContainer');
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            previewContainer.classList.remove('hidden');
+        }
+        reader.readAsDataURL(file);
+    });
+</script>
+
+</body>
+</html>

@@ -3,6 +3,11 @@ console.log("✅ Script loaded");
 // Dynamically determine the backend URL based on the device accessing it
 const API_BASE_URL = `http://${window.location.hostname}:5000`;
 
+// --- Global Camera State ---
+let stream = null;
+let capturedFile = null;
+let currentFacingMode = "environment"; // Default to back camera
+
 // --- Login Logic ---
 const loginSection = document.getElementById("loginSection");
 const mainContent = document.getElementById("mainContent");
@@ -178,7 +183,34 @@ analyzeBtn.addEventListener("click", async () => {
                 startAnalysis(lat, lon, name + " (From Image GPS)");
                 return;
             } else {
-                console.log("⚠️ This specific image does NOT have any hidden GPS location data inside it.");
+                console.log("⚠️ This image does NOT have GPS location data.");
+                const rawInput = prompt("No location in image. Please enter your City/Village/District name:", "Delhi");
+                
+                if (!rawInput) {
+                    startAnalysis(null, null, "Delhi (Default)");
+                    return;
+                }
+
+                statusMsg.innerText = `🔍 Validating location: ${rawInput}...`;
+                try {
+                    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rawInput)}&limit=1`);
+                    const geoData = await geoRes.json();
+                    
+                    if (geoData && geoData.length > 0) {
+                        const validatedName = geoData[0].display_name.split(',')[0]; // Get city name
+                        const lat = geoData[0].lat;
+                        const lon = geoData[0].lon;
+                        console.log(`✅ Validated Location: ${validatedName} (${lat}, ${lon})`);
+                        startAnalysis(lat, lon, validatedName + " (Manual)");
+                    } else {
+                        alert(`❌ Unable to find '${rawInput}'. We'll use Delhi for weather data.`);
+                        startAnalysis(28.6139, 77.2090, "Delhi (Fallback)");
+                    }
+                } catch (err) {
+                    console.warn("Geocoding validation failed:", err);
+                    startAnalysis(null, null, rawInput + " (Manual-Unverified)");
+                }
+                return;
             }
         } catch (e) {
             console.warn("Could not read EXIF data:", e);
@@ -261,6 +293,86 @@ async function sendChat() {
         addChatMessage("bot", "Oops, I'm having trouble connecting to the brain. Is the server running?");
     }
 }
+
+// --- Live Camera Action ---
+const openCameraBtn = document.getElementById("openCameraBtn");
+const cameraModal = document.getElementById("cameraModal");
+const cameraStream = document.getElementById("cameraStream");
+const snapPhotoBtn = document.getElementById("snapPhotoBtn");
+const closeCameraBtn = document.getElementById("closeCameraBtn");
+const flipCameraBtn = document.getElementById("flipCameraBtn");
+
+async function startCamera() {
+    if (stream) stopCamera();
+
+    // Secure context check
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Camera feature requires a Secure Context (HTTPS) or localhost. ❌");
+        return;
+    }
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: currentFacingMode } 
+        });
+        cameraStream.srcObject = stream;
+        cameraModal.classList.remove("hidden");
+    } catch (err) {
+        console.error("Camera Error:", err);
+        alert("Camera access denied! Check permissions and browser settings. ❌");
+    }
+}
+
+openCameraBtn.addEventListener("click", startCamera);
+
+flipCameraBtn.addEventListener("click", () => {
+    currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+    startCamera(); // Restart stream with new mode
+});
+
+closeCameraBtn.addEventListener("click", stopCamera);
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    cameraModal.classList.add("hidden");
+    cameraStream.srcObject = null;
+}
+
+snapPhotoBtn.addEventListener("click", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = cameraStream.videoWidth;
+    canvas.height = cameraStream.videoHeight;
+    canvas.getContext("2d").drawImage(cameraStream, 0, 0);
+
+    const dataUrl = canvas.toDataURL("image/jpeg");
+    
+    // Update local UI preview
+    const preview = document.getElementById("imagePreview");
+    preview.src = dataUrl;
+    document.getElementById("imagePreviewContainer").classList.remove("hidden");
+    document.getElementById("fileLabel").innerHTML = `✅ Captured from Live Camera`;
+
+    // Create a pseudo-file object for our detection logic
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    capturedFile = new File([blob], "capture.jpg", { type: "image/jpeg" });
+
+    // Stop camera and immediately trigger analysis
+    stopCamera();
+    
+    // We update the global file so analyzeBtn handler picks it up
+    const fileInput = document.getElementById("imageInput");
+    
+    // Use a DataTransfer object to mock file selection for the hidden input
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(capturedFile);
+    fileInput.files = dataTransfer.files;
+
+    // Auto-click the analyze button
+    analyzeBtn.click();
+});
 
 sendChatBtn.addEventListener("click", sendChat);
 chatInput.addEventListener("keypress", (e) => {

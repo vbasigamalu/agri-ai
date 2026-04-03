@@ -41,9 +41,24 @@
             <label class="upload-label" id="fileLabel" for="imageInput">
                 📸 Click or drag <span>Crop Image</span> to upload
             </label>
+            <p>-- OR --</p>
+            <button type="button" id="openCameraBtn" class="secondary-btn">🤳 Open Live Camera</button>
             <input type="file" id="imageInput" accept="image/*" capture="camera" hidden>
+            
             <div id="imagePreviewContainer" class="hidden">
                 <img id="imagePreview" src="" alt="Crop Preview">
+            </div>
+        </div>
+
+        <!-- Camera Modal -->
+        <div id="cameraModal" class="modal hidden">
+            <div class="modal-content">
+                <video id="cameraStream" autoplay playsinline></video>
+                <div class="camera-controls">
+                    <button id="snapPhotoBtn" class="capture-btn">📸 Capture & Analyze</button>
+                    <button id="flipCameraBtn" class="mini-btn">🔄 Flip</button>
+                    <button id="closeCameraBtn" class="close-btn">Cancel</button>
+                </div>
             </div>
         </div>
 

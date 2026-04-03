@@ -1,5 +1,8 @@
 console.log("✅ Script loaded");
 
+// Dynamically determine the backend URL based on the device accessing it
+const API_BASE_URL = `http://${window.location.hostname}:5000`;
+
 // --- Login Logic ---
 const loginSection = document.getElementById("loginSection");
 const mainContent = document.getElementById("mainContent");
@@ -19,7 +22,7 @@ loginBtn.addEventListener("click", () => {
     const pass = passwordInput.value;
 
     // Simple demo credentials - in real app, these should be checked via backend
-    if (user === "farmer123" && pass === "password") {
+    if (user === "vishnu" && pass === "123456") {
         localStorage.setItem("isLoggedIn", "true");
         showMainApp();
     } else {
@@ -58,7 +61,7 @@ analyzeBtn.addEventListener("click", async () => {
 
     const startAnalysis = async (lat, lon, locName = "Searching...") => {
         statusMsg.innerText = "🔍 Analyzing crop...";
-        
+
         // Show the location name in the UI
         const locNameEl = document.getElementById("locationName");
         locNameEl.innerText = locName;
@@ -70,7 +73,7 @@ analyzeBtn.addEventListener("click", async () => {
         formData.append("locationName", locName); // Send location name to backend too
 
         try {
-            const response = await fetch("http://127.0.0.1:5000/analyze", {
+            const response = await fetch(`${API_BASE_URL}/analyze`, {
                 method: "POST",
                 body: formData
             });
@@ -144,11 +147,11 @@ analyzeBtn.addEventListener("click", async () => {
     // New: Helper to convert EXIF degrees/minutes/seconds to decimals
     function convertDMSToDecimal(dms, ref) {
         if (!dms || dms.length < 3) return null;
-        
+
         let degrees = dms[0].numerator ? (dms[0].numerator / dms[0].denominator) : Number(dms[0]);
         let minutes = dms[1].numerator ? (dms[1].numerator / dms[1].denominator) : Number(dms[1]);
         let seconds = dms[2].numerator ? (dms[2].numerator / dms[2].denominator) : Number(dms[2]);
-        
+
         let decimal = degrees + (minutes / 60) + (seconds / 3600);
         if (ref === "S" || ref === "W") decimal *= -1;
         return decimal;
@@ -156,11 +159,11 @@ analyzeBtn.addEventListener("click", async () => {
 
     async function detectLocation() {
         statusMsg.innerText = "📍 Detecting crop location...";
-        
+
         // 1. Try Image EXIF Data (Most accurate for 'crop location')
         try {
             const exifData = await new Promise((resolve) => {
-                EXIF.getData(file, function() {
+                EXIF.getData(file, function () {
                     resolve(EXIF.getAllTags(this));
                 });
             });
@@ -238,12 +241,12 @@ async function sendChat() {
     chatInput.value = "";
 
     try {
-        const response = await fetch("http://127.0.0.1:5000/chat", {
+        const response = await fetch(`${API_BASE_URL}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                question: text, 
-                history: chatHistory 
+            body: JSON.stringify({
+                question: text,
+                history: chatHistory
             })
         });
 
@@ -263,4 +266,4 @@ sendChatBtn.addEventListener("click", sendChat);
 chatInput.addEventListener("keypress", (e) => {
     if (e.key === "Enter") sendChat();
 });
-
+

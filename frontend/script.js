@@ -337,7 +337,7 @@ function stopCamera() {
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
-    cameraModal.classList.remove("hidden");
+    cameraModal.classList.add("hidden");
     cameraStream.srcObject = null;
 }
 
@@ -407,7 +407,6 @@ if (SpeechRecognition) {
 
             recognition.start();
             micBtn.classList.add("recording");
-            micBtn.innerText = "🔴";
             chatInput.placeholder = "Listening... Speak clearly now!";
         } catch (err) {
             console.warn("Recognition error:", err);
@@ -424,14 +423,12 @@ if (SpeechRecognition) {
 
     recognition.onend = () => {
         micBtn.classList.remove("recording");
-        micBtn.innerText = "🎙️";
         chatInput.placeholder = "Ask about treatment, soil, seeds...";
     };
 
     recognition.onerror = (event) => {
         console.error("Speech Recognition Error:", event.error);
         micBtn.classList.remove("recording");
-        micBtn.innerText = "🎙️";
     };
 } else {
     micBtn.style.display = "none";

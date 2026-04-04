@@ -7,7 +7,30 @@
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    <style>
+        .logout-fixed-btn {
+            width: 38px !important;
+            height: 38px !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            background: rgba(239, 68, 68, 0.1) !important;
+            color: #f87171 !important;
+            border: 1px solid rgba(239, 68, 68, 0.2) !important;
+            border-radius: 10px !important;
+            font-size: 1.2rem !important;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.2s;
+        }
 
+        .logout-fixed-btn:hover {
+            background: #ef4444 !important;
+            color: #fff !important;
+            transform: scale(1.1);
+        }
+    </style>
 </head>
 <body>
 
@@ -15,7 +38,7 @@
     <!-- Global Language Selector -->
     <div class="global-header">
         <div id="google_translate_element"></div>
-        <button id="logoutBtn" class="logout-text-btn hidden">Logout</button>
+        <button id="logoutBtn" class="logout-fixed-btn hidden" title="Logout">🚪</button>
     </div>
     
     <!-- Login Section -->

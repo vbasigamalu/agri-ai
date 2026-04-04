@@ -17,10 +17,8 @@ const loginError = document.getElementById("loginError");
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 
-// Check if already logged in
-if (localStorage.getItem("isLoggedIn") === "true") {
-    showMainApp();
-}
+// Automatic login check removed to ensure the app starts on the login page every time.
+// --- Login Logic ---
 
 loginBtn.addEventListener("click", () => {
     const user = usernameInput.value;
@@ -43,6 +41,7 @@ logoutBtn.addEventListener("click", () => {
 function showMainApp() {
     loginSection.classList.add("hidden");
     mainContent.classList.remove("hidden");
+    logoutBtn.classList.remove("hidden");
 }
 
 // --- Main App Logic ---
@@ -273,12 +272,14 @@ async function sendChat() {
     chatInput.value = "";
 
     try {
+        const currentLang = getCurrentLanguage();
         const response = await fetch(`${API_BASE_URL}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 question: text,
-                history: chatHistory
+                history: chatHistory,
+                language: currentLang
             })
         });
 
@@ -336,7 +337,7 @@ function stopCamera() {
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
-    cameraModal.classList.add("hidden");
+    cameraModal.classList.remove("hidden");
     cameraStream.srcObject = null;
 }
 
@@ -374,8 +375,90 @@ snapPhotoBtn.addEventListener("click", async () => {
     analyzeBtn.click();
 });
 
+// --- Voice Input Logic ---
+const micBtn = document.getElementById("micBtn");
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true; // Show results as they are being spoken
+    recognition.maxAlternatives = 1;
+
+    micBtn.addEventListener("click", () => {
+        try {
+            const currentLang = getCurrentLanguage();
+            // Robust mapping for both English and Native names found in the widget
+            const languageCodes = {
+                "English": "en-IN", "english": "en-IN", "en": "en-IN",
+                "Hindi": "hi-IN", "हिंदी": "hi-IN", "hi": "hi-IN",
+                "Marathi": "mr-IN", "मराठी": "mr-IN", "mr": "mr-IN",
+                "Punjabi": "pa-IN", "ਪੰਜਾਬੀ": "pa-IN", "pa": "pa-IN",
+                "Bengali": "bn-IN", "বাংলা": "bn-IN", "bn": "bn-IN",
+                "Telugu": "te-IN", "తెలుగు": "te-IN", "te": "te-IN",
+                "Tamil": "ta-IN", "தமிழ்": "ta-IN", "ta": "ta-IN",
+                "Kannada": "kn-IN", "ಕನ್ನಡ": "kn-IN", "kn": "kn-IN",
+                "Malayalam": "ml-IN", "മലയാളം": "ml-IN", "ml": "ml-IN",
+                "Gujarati": "gu-IN", "ગુજરાતી": "gu-IN", "gu": "gu-IN"
+            };
+            recognition.lang = languageCodes[currentLang] || "en-IN";
+            console.log("🎤 Recognition Lang set to:", recognition.lang, `(From UI: "${currentLang}")`);
+
+            recognition.start();
+            micBtn.classList.add("recording");
+            micBtn.innerText = "🔴";
+            chatInput.placeholder = "Listening... Speak clearly now!";
+        } catch (err) {
+            console.warn("Recognition error:", err);
+        }
+    });
+
+    recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+        chatInput.value = transcript; // Live update the field
+    };
+
+    recognition.onend = () => {
+        micBtn.classList.remove("recording");
+        micBtn.innerText = "🎙️";
+        chatInput.placeholder = "Ask about treatment, soil, seeds...";
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech Recognition Error:", event.error);
+        micBtn.classList.remove("recording");
+        micBtn.innerText = "🎙️";
+    };
+} else {
+    micBtn.style.display = "none";
+}
+
 sendChatBtn.addEventListener("click", sendChat);
 chatInput.addEventListener("keypress", (e) => {
     if (e.key === "Enter") sendChat();
 });
+
+// Helper to get current translation language from Google Translate Widget
+function getCurrentLanguage() {
+    // A. Check the <html> tag. Google Translate usually updates the 'lang' attribute.
+    const htmlLang = document.documentElement.lang;
+    if (htmlLang && htmlLang !== 'en' && htmlLang.length <= 5) return htmlLang;
+
+    // B. Check the Simple Layout text value (it might be in native script)
+    const simpleValueSpan = document.querySelector('.goog-te-menu-value span:first-child');
+    if (simpleValueSpan) {
+        let text = simpleValueSpan.innerText.trim();
+        if (!text.includes("Select Language")) return text;
+    }
+
+    // C. Check the standard select value
+    const select = document.querySelector('.goog-te-combo');
+    if (select) return select.value || select.options[select.selectedIndex].text;
+
+    return "English";
+}
 

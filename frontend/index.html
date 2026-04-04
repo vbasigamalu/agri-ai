@@ -12,6 +12,12 @@
 <body>
 
 <div class="container">
+    <!-- Global Language Selector -->
+    <div class="global-header">
+        <div id="google_translate_element"></div>
+        <button id="logoutBtn" class="logout-text-btn hidden">Logout</button>
+    </div>
+    
     <!-- Login Section -->
     <div id="loginSection">
         <h2>👨‍🌾 Farmer Login</h2>
@@ -34,104 +40,104 @@
     <div id="mainContent" class="hidden">
         <div class="header-row">
             <h2>🌾 Smart Agro Advisor</h2>
-            <div class="header-controls">
-                <div id="google_translate_element"></div>
-                <button id="logoutBtn" class="small-btn">Logout</button>
-            </div>
+            <div class="header-control-stub"></div>
         </div>
 
-        <div class="upload-section">
-            <label class="upload-label" id="fileLabel" for="imageInput">
-                📸 Click or drag <span>Crop Image</span> to upload
-            </label>
-            <p>-- OR --</p>
-            <button type="button" id="openCameraBtn" class="secondary-btn">🤳 Open Live Camera</button>
-            <input type="file" id="imageInput" accept="image/*" capture="camera" hidden>
-            
-            <div id="imagePreviewContainer" class="hidden">
-                <img id="imagePreview" src="" alt="Crop Preview">
-            </div>
-        </div>
+        <div class="main-grid">
+            <div class="analysis-panel">
+                <div class="upload-section">
+                    <label class="upload-label" id="fileLabel" for="imageInput">
+                        📸 Click or drag <span>Crop Image</span> to upload
+                    </label>
+                    <p>-- OR --</p>
+                    <button type="button" id="openCameraBtn" class="secondary-btn">🤳 Open Live Camera</button>
+                    <input type="file" id="imageInput" accept="image/*" capture="camera" hidden>
+                    
+                    <div id="imagePreviewContainer" class="hidden">
+                        <img id="imagePreview" src="" alt="Crop Preview">
+                    </div>
+                </div>
 
-        <!-- Camera Modal -->
-        <div id="cameraModal" class="modal hidden">
-            <div class="modal-content">
-                <video id="cameraStream" autoplay playsinline></video>
-                <div class="camera-controls">
-                    <button id="snapPhotoBtn" class="capture-btn">📸 Capture & Analyze</button>
-                    <button id="flipCameraBtn" class="mini-btn">🔄 Flip</button>
-                    <button id="closeCameraBtn" class="close-btn">Cancel</button>
+                <div id="cameraModal" class="modal hidden">
+                    <div class="modal-content">
+                        <video id="cameraStream" autoplay playsinline></video>
+                        <div class="camera-controls">
+                            <button id="snapPhotoBtn" class="capture-btn">📸 Capture & Analyze</button>
+                            <button id="flipCameraBtn" class="mini-btn">🔄 Flip</button>
+                            <button id="closeCameraBtn" class="close-btn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="analyzeBtn">Analyze Crop Conditions</button>
+                <p id="statusMsg"></p>
+
+                <div class="results">
+                    <div class="result-card full-width">
+                        <p>📍 Detection Location</p>
+                        <div class="location-row">
+                            <span id="locationName">---</span>
+                            <button id="changeLocBtn" class="mini-btn">Change</button>
+                        </div>
+                    </div>
+                    <div class="result-card full-width">
+                        <p>🦠 Predicted Disease</p>
+                        <span id="disease">---</span>
+                    </div>
+                    <div class="result-card full-width spray-decision">
+                        <p>🔫 Spray Decision</p>
+                        <span id="sprayDecision">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>⏱️ Spray Timing</p>
+                        <span id="sprayActionTime">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>💧 Spray Quantity</p>
+                        <span id="sprayQuantity">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>🎯 Confidence</p>
+                        <span id="confidence">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>📊 Severity</p>
+                        <span id="severity">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>🌡️ Temperature</p>
+                        <span id="temperature">---</span>
+                    </div>
+                    <div class="result-card">
+                        <p>💧 Humidity</p>
+                        <span id="humidity">---</span>
+                    </div>
+                    <div class="result-card full-width">
+                        <p>⚠ Analysis Alert</p>
+                        <span id="alert">-- No analysis run --</span>
+                    </div>
+                </div>
+
+                <div class="advice-section">
+                    <h3>🌱 Expert Advice</h3>
+                    <ul id="adviceList">
+                        <li>Upload image for advice</li>
+                    </ul>
                 </div>
             </div>
-        </div>
 
-        <button type="button" id="analyzeBtn">Analyze Crop Conditions</button>
-
-        <p id="statusMsg"></p>
-
-        <div class="results">
-            <div class="result-card full-width">
-                <p>📍 Detection Location</p>
-                <div class="location-row">
-                    <span id="locationName">---</span>
-                    <button id="changeLocBtn" class="mini-btn">Change</button>
+            <div class="chat-panel">
+                <div class="chat-section">
+                    <h3>💬 Ask Agri-Advisor</h3>
+                    <div class="chat-box" id="chatBox">
+                        <div class="message bot-msg">Hello! I'm your AI Agricultural Assistant. After analyzing your crop, feel free to ask me for detailed treatment steps or any farming questions!</div>
+                    </div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chatInput" placeholder="Ask about treatment, soil, seeds...">
+                        <button type="button" id="micBtn" class="mic-btn">🎙️</button>
+                        <button type="button" id="sendChatBtn" class="send-btn">Send</button>
+                    </div>
                 </div>
-            </div>
-            <div class="result-card full-width">
-                <p>🦠 Predicted Disease</p>
-                <span id="disease">---</span>
-            </div>
-            <div class="result-card full-width spray-decision">
-                <p>🔫 Spray Decision</p>
-                <span id="sprayDecision">---</span>
-            </div>
-            <div class="result-card">
-                <p>⏱️ Spray Timing</p>
-                <span id="sprayActionTime">---</span>
-            </div>
-            <div class="result-card">
-                <p>💧 Spray Quantity</p>
-                <span id="sprayQuantity">---</span>
-            </div>
-            <div class="result-card">
-                <p>🎯 Confidence</p>
-                <span id="confidence">---</span>
-            </div>
-            <div class="result-card">
-                <p>📊 Severity</p>
-                <span id="severity">---</span>
-            </div>
-            <div class="result-card">
-                <p>🌡️ Temperature</p>
-                <span id="temperature">---</span>
-            </div>
-            <div class="result-card">
-                <p>💧 Humidity</p>
-                <span id="humidity">---</span>
-            </div>
-            <div class="result-card full-width">
-                <p>⚠ Analysis Alert</p>
-                <span id="alert">-- No analysis run --</span>
-            </div>
-        </div>
-
-        <div class="advice-section">
-            <h3>🌱 Expert Advice</h3>
-            <ul id="adviceList">
-                <li>Upload image for advice</li>
-            </ul>
-        </div>
-
-        <!-- Chatbot Section -->
-        <div class="chat-section">
-            <h3>💬 Ask Agri-Advisor</h3>
-            <div class="chat-box" id="chatBox">
-                <div class="message bot-msg">Hello! I'm your AI Agricultural Assistant. After analyzing your crop, feel free to ask me for detailed treatment steps or any farming questions!</div>
-            </div>
-            <div class="chat-input-row">
-                <input type="text" id="chatInput" placeholder="Ask about treatment, soil, seeds...">
-                <button type="button" id="sendChatBtn" class="send-btn">Send</button>
-
             </div>
         </div>
     </div>
@@ -147,6 +153,8 @@
 function googleTranslateElementInit() {
   new google.translate.TranslateElement({
       pageLanguage: 'en',
+      includedLanguages: 'en,hi,mr,pa,bn,te,ta,kn,ml,gu',
+      layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
       autoDisplay: true
   }, 'google_translate_element');
 }

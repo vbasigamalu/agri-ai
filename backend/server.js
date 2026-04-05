@@ -31,7 +31,7 @@ const systemInstruction = `You are Agri-AI, the expert digital assistant for the
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const geminiModel = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: systemInstruction
 });
 
@@ -242,6 +242,18 @@ app.get("/history", (req, res) => {
         res.json(history);
     } catch (err) {
         res.status(500).json({ error: "Could not read history." });
+    }
+});
+
+// 4. GOVT SCHEMES (Basic Data + Live Links)
+app.get("/schemes", (req, res) => {
+    try {
+        const schemesFile = fs.readFileSync("./schemes.json", "utf-8");
+        const schemes = JSON.parse(schemesFile);
+        res.json(schemes);
+    } catch (err) {
+        console.error("SCHEMES ERROR:", err);
+        res.status(500).json({ error: "Could not read schemes data." });
     }
 });
 

@@ -66,7 +66,13 @@
             <div class="header-control-stub"></div>
         </div>
 
-        <div class="main-grid">
+        <div class="tabs-container">
+            <button class="tab-btn active" data-target="advisorTab">Smart Advisor</button>
+            <button class="tab-btn" data-target="schemesTab">Govt Schemes</button>
+        </div>
+
+        <div id="advisorTab" class="tab-content active">
+            <div class="main-grid">
             <div class="analysis-panel">
                 <div class="upload-section">
                     <label class="upload-label" id="fileLabel" for="imageInput">
@@ -161,6 +167,13 @@
                         <button type="button" id="sendChatBtn" class="send-btn">Send</button>
                     </div>
                 </div>
+            </div>
+            </div>
+        </div>
+
+        <div id="schemesTab" class="tab-content hidden">
+            <div id="schemesGrid" class="schemes-grid">
+                <p>Loading schemes...</p>
             </div>
         </div>
     </div>

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pm-kisan",
+    "name": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)",
+    "target": "Small & Marginal Farmers",
+    "summary": "Income support of ₹6,000 per year in three equal installments directly to bank accounts.",
+    "eligibility": "Landholding farmers families (subject to certain exclusions).",
+    "officialUrl": "https://pmkisan.gov.in/"
+  },
+  {
+    "id": "pmfby",
+    "name": "PMFBY (Pradhan Mantri Fasal Bima Yojana)",
+    "target": "All Farmers",
+    "summary": "Crop insurance scheme protecting against non-preventable natural risks from pre-sowing to post-harvest.",
+    "eligibility": "Farmers growing notified crops in notified areas.",
+    "officialUrl": "https://pmfby.gov.in/"
+  },
+  {
+    "id": "kcc",
+    "name": "Kisan Credit Card (KCC)",
+    "target": "All Farmers",
+    "summary": "Short-term formal credit for agricultural needs at subsidized interest rates.",
+    "eligibility": "All farmers, sharecroppers, tenant farmers.",
+    "officialUrl": "https://agricoop.nic.in/en/kisan-credit-card"
+  },
+  {
+    "id": "enam",
+    "name": "e-NAM (National Agriculture Market)",
+    "target": "Farmers & FPOs",
+    "summary": "Pan-India electronic trading portal networking existing APMC mandis.",
+    "eligibility": "Farmers looking to sell their produce competitively.",
+    "officialUrl": "https://enam.gov.in/"
+  },
+  {
+    "id": "shc",
+    "name": "Soil Health Card Scheme",
+    "target": "All Farmers",
+    "summary": "Provides information to farmers on nutrient status of their soil along with recommendation on appropriate dosage of nutrients.",
+    "eligibility": "All farmers are covered to get soil tested.",
+    "officialUrl": "https://soilhealth.dac.gov.in/"
+  }
+]

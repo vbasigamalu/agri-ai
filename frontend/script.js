@@ -139,12 +139,33 @@ analyzeBtn.addEventListener("click", async () => {
 
     async function getAddressFromCoords(lat, lon) {
         try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-            const data = await response.json();
-            return data.display_name || "Unknown Location";
+            // Priority 1: Try precise address down to building/street level (zoom=18)
+            const preciseRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
+            if (preciseRes.ok) {
+                const preciseData = await preciseRes.json();
+                if (preciseData.display_name && !preciseData.error) return preciseData.display_name;
+            }
+
+            // Priority 2: If too remote for street level, try village/suburb level (zoom=14)
+            const broadRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14`);
+            if (broadRes.ok) {
+                const broadData = await broadRes.json();
+                if (broadData.display_name && !broadData.error) return broadData.display_name;
+            }
+
+            // Fallback API if Nominatim fails or returns no address for the coordinates
+            const resBdc = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+            if (resBdc.ok) {
+                const dataBdc = await resBdc.json();
+                const locName = [dataBdc.locality, dataBdc.city, dataBdc.principalSubdivision].filter(Boolean).join(", ");
+                if (locName) return locName;
+            }
+
+            // Ultimate fallback to coordinates
+            return `Lat: ${parseFloat(lat).toFixed(4)}, Lon: ${parseFloat(lon).toFixed(4)}`;
         } catch (err) {
             console.error("Geocoding error:", err);
-            return "Unknown Location";
+            return `Lat: ${parseFloat(lat).toFixed(4)}, Lon: ${parseFloat(lon).toFixed(4)}`;
         }
     }
 
@@ -459,3 +480,57 @@ function getCurrentLanguage() {
     return "English";
 }
 
+// --- Tabs Logic ---
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove active class from all
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.add('hidden'));
+
+        // Add active class to clicked
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-target');
+        document.getElementById(targetId).classList.remove('hidden');
+
+        // Load schemes if schemes tab clicked
+        if (targetId === 'schemesTab') {
+            loadSchemes();
+        }
+    });
+});
+
+// --- Schemes Logic ---
+async function loadSchemes() {
+    const grid = document.getElementById('schemesGrid');
+    
+    // Only load if it's currently showing "Loading..." to avoid redundant fetches
+    if (grid.innerHTML.includes('Loading schemes')) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/schemes`);
+            const schemes = await response.json();
+            
+            grid.innerHTML = ''; // Clear loading text
+            
+            schemes.forEach(scheme => {
+                const card = document.createElement('div');
+                card.className = 'scheme-card';
+                card.innerHTML = `
+                    <h3>📌 ${scheme.name}</h3>
+                    <div class="scheme-target">Target: ${scheme.target}</div>
+                    <div class="scheme-summary">${scheme.summary}</div>
+                    <div class="scheme-eligibility"><strong>Eligibility:</strong> ${scheme.eligibility}</div>
+                    <a href="${scheme.officialUrl}" target="_blank" rel="noopener noreferrer" class="scheme-link">
+                        🌐 Visit Official Platform
+                    </a>
+                `;
+                grid.appendChild(card);
+            });
+        } catch (err) {
+            console.error("Error loading schemes:", err);
+            grid.innerHTML = '<p style="color:var(--danger)">❌ Failed to load schemes. Make sure backend is running.</p>';
+        }
+    }
+}

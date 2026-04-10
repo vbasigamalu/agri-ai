@@ -99,9 +99,15 @@ analyzeBtn.addEventListener("click", async () => {
             document.getElementById("humidity").innerText = data.humidity + " %";
             document.getElementById("alert").innerText = data.alert;
 
+            // Show causedBy info
+            const causedByEl = document.getElementById("causedBy");
+            if (data.causedBy) {
+                causedByEl.innerText = "Caused by: " + data.causedBy;
+            }
+
             // Decision highlighting
             const sprayEl = document.getElementById("sprayDecision");
-            if (data.spray.toLowerCase().includes("immediately")) {
+            if (data.severity === "Critical") {
                 sprayEl.parentElement.classList.add("danger-bg");
                 sprayEl.style.color = "#ff4d4d";
             } else {
@@ -109,24 +115,60 @@ analyzeBtn.addEventListener("click", async () => {
                 sprayEl.style.color = "var(--primary)";
             }
 
-            // Optional: color-code severity
+            // Color-code severity
             const severityEl = document.getElementById("severity");
-            severityEl.style.color = (data.severity.toLowerCase() === 'critical' || data.severity.toLowerCase() === 'high') ? '#ff4d4d' : '#ffae42';
+            const sevLower = data.severity.toLowerCase();
+            severityEl.style.color = (sevLower === 'critical') ? '#ff4d4d' : (sevLower === 'major') ? '#ffae42' : '#10b981';
 
+            // Render symptoms
+            const symptomsList = document.getElementById("symptomsList");
+            symptomsList.innerHTML = "";
+            if (data.symptoms && data.symptoms.length > 0) {
+                data.symptoms.forEach(item => {
+                    const li = document.createElement("li");
+                    li.innerText = item;
+                    symptomsList.appendChild(li);
+                });
+            }
+
+            // Render treatment advice
             const adviceList = document.getElementById("adviceList");
             adviceList.innerHTML = "";
-            data.advice.forEach(item => {
-                const li = document.createElement("li");
-                li.innerText = item;
-                adviceList.appendChild(li);
-            });
+            if (data.advice && data.advice.length > 0) {
+                data.advice.forEach(item => {
+                    const li = document.createElement("li");
+                    li.innerText = item;
+                    adviceList.appendChild(li);
+                });
+            }
 
-            statusMsg.innerText = "✅ Analysis complete!";
+            // Render prevention tips
+            const preventionList = document.getElementById("preventionList");
+            preventionList.innerHTML = "";
+            if (data.prevention && data.prevention.length > 0) {
+                data.prevention.forEach(item => {
+                    const li = document.createElement("li");
+                    li.innerText = item;
+                    preventionList.appendChild(li);
+                });
+            }
+
+            // Render spray safety warnings
+            const warningsList = document.getElementById("sprayWarnings");
+            warningsList.innerHTML = "";
+            if (data.sprayWarnings && data.sprayWarnings.length > 0) {
+                data.sprayWarnings.forEach(w => {
+                    const li = document.createElement("li");
+                    li.innerText = w;
+                    warningsList.appendChild(li);
+                });
+            }
+
+            statusMsg.innerText = "✅ Analysis complete! (Local ML — No API)";
             document.querySelector(".results").scrollIntoView({ behavior: 'smooth' });
 
-
             // Add the analysis result to chat context
-            addChatMessage("bot", `I've analyzed your crop. I found **${data.disease}**. ${data.description}. How can I help with the treatment?`);
+            addChatMessage("bot", `I've analyzed your crop using local ML. Disease detected: ${data.disease}. ${data.description} Ask me for treatment details or prevention tips!`);
 
         } catch (err) {
             console.error("FETCH ERROR:", err);
@@ -199,8 +241,16 @@ analyzeBtn.addEventListener("click", async () => {
                 const lat = convertDMSToDecimal(exifData.GPSLatitude, exifData.GPSLatitudeRef);
                 const lon = convertDMSToDecimal(exifData.GPSLongitude, exifData.GPSLongitudeRef);
                 console.log(`📍 Found GPS in Image: Lat ${lat}, Lon ${lon}`);
-                const name = await getAddressFromCoords(lat, lon);
-                startAnalysis(lat, lon, name + " (From Image GPS)");
+                
+                // INSTANT TRIGGER: Start AI analysis immediately with coordinates
+                const tempLoc = `📍 [${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
+                startAnalysis(lat, lon, tempLoc);
+                
+                // BACKGROUND RESOLUTION: Update the address name silenty
+                getAddressFromCoords(lat, lon).then(name => {
+                    const locNameEl = document.getElementById("locationName");
+                    if (locNameEl) locNameEl.innerText = name + " (From Image GPS)";
+                });
                 return;
             } else {
                 console.log("⚠️ This image does NOT have GPS location data.");
@@ -242,9 +292,16 @@ analyzeBtn.addEventListener("click", async () => {
                 async (position) => {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-                    const name = await getAddressFromCoords(lat, lon);
-                    console.log("📍 Location detected from Browser GPS:", name);
-                    startAnalysis(lat, lon, name + " (From Device GPS)");
+                    
+                    // INSTANT TRIGGER: Start AI analysis immediately with coordinates
+                    const tempLoc = `📍 [${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
+                    startAnalysis(lat, lon, tempLoc);
+
+                    // BACKGROUND RESOLUTION: Update the address name silenty
+                    getAddressFromCoords(lat, lon).then(name => {
+                        const locNameEl = document.getElementById("locationName");
+                        if (locNameEl) locNameEl.innerText = name + " (From Device GPS)";
+                    });
                 },
                 async (error) => {
                     console.warn("Geolocation failed:", error.message);

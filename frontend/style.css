@@ -253,23 +253,102 @@ button:hover {
 .full-width { grid-column: span 2; }
 #disease { color: var(--primary-light); font-size: 1.4rem; }
 
+/* ML Badge */
+.ml-badge {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.15));
+    color: var(--primary-light);
+    padding: 0.5rem 1.2rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    white-space: nowrap;
+}
+
+/* Caused By subtitle */
+.caused-by {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* Warning List */
+.warning-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.warning-list li {
+    border-left-color: #f59e0b;
+    font-size: 0.9rem;
+    padding: 0.8rem 1.1rem;
+}
+
+/* Danger background for critical spray */
+.danger-bg {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
 /* Advice Section */
 .advice-section {
-    margin-top: 3rem;
+    margin-top: 2.5rem;
 }
 
 .advice-section h3 {
-    font-size: 1.25rem;
-    margin-bottom: 1.5rem;
+    font-size: 1.15rem;
+    margin-bottom: 1.2rem;
     color: var(--primary-light);
 }
 
 li {
     background: rgba(255, 255, 255, 0.02);
-    padding: 1.1rem 1.4rem;
+    padding: 1rem 1.3rem;
     border-radius: 14px;
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.7rem;
     border-left: 3px solid var(--primary);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+/* Header row layout */
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.header-row h2 {
+    margin-bottom: 0;
+}
+
+/* Location row */
+.location-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.mini-btn {
+    width: auto !important;
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.75rem !important;
+    background: transparent !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text-muted) !important;
+    border-radius: 8px !important;
+}
+
+.mini-btn:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
 }
 
 /* Chatbot Area */

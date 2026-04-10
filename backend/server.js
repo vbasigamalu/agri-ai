@@ -1,248 +1,98 @@
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios");
 const multer = require("multer");
+const axios = require("axios");
+const path = require("path");
 const fs = require("fs");
-require("dotenv").config({ override: true });
-const Groq = require("groq-sdk");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const db = require("./dbHelper");
+const dotenv = require("dotenv");
+const { initClassifier, classify, isReady } = require("./classifier");
+const { getDiseaseInfo, searchByKeyword } = require("./cropDatabase");
 
+dotenv.config();
 
 const app = express();
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const systemInstruction = `You are Agri-AI, the expert digital assistant for the Smart Crop Advisor project. 
-    Your mission is to provide high-precision, actionable farming advice based on visual crop analysis and real-time environmental data.
-
-    KEY PROJECT CAPABILITIES:
-    - DISESASE ANALYSIS: We use Gemini Vision to identify crop issues from photos.
-    - WEATHER INTEGRATION: We fetch real-time temp/humidity/wind to adjust treatment safety.
-    - SPRAY DECISIONS: We provide specific 'What', 'When', and 'How Much' for treatments.
-
-    CORE RULES:
-    1. CONTEXT AWARENESS: Always prioritize the most recent crop analysis records provided. If no analysis is present, ask the user to upload a crop photo first.
-    2. PRECISION: When asked follow-up questions, give direct, numbered, or bulleted steps. Avoid long paragraphs.
-    3. SAFETY & GROUNDING: Only suggest verified agricultural chemicals. If weather is risky (e.g., high wind > 20km/h or heavy rain), warn against spraying.
-    4. FOLLOW-UPS: Keep replies to follow-up questions under 3-4 sentences unless a detailed "how-to" is requested.
-    5. NO HALLUCINATION: If the data is missing (e.g., specific pesticide dosage for a rare crop), tell the user to consult a local agricultural officer.`;
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: systemInstruction
-});
-
-
-
-
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../frontend")));
 
-console.log("✅ Agri-AI Server starting...");
+const upload = multer({ storage: multer.memoryStorage() });
 
-// 1. IMAGE ANALYSIS (High-Performance)
+// ═══════════════════════════════════════════════
+//  API ENDPOINTS
+// ═══════════════════════════════════════════════
+
+// 1. ANALYSIS PIPELINE (Parallel Engine + Weather)
 app.post("/analyze", upload.single("image"), async (req, res) => {
+    if (!isReady()) return res.status(503).json({ error: "Agri-AI Engine warming up... please wait." });
+    if (!req.file) return res.status(400).json({ error: "No image provided" });
     try {
-        if (!req.file) return res.status(400).json({ error: "No image uploaded" });
-
-        const lat = parseFloat(req.body.lat);
-        const lon = parseFloat(req.body.lon);
-        const locationName = req.body.locationName || "Somewhere in the world";
-
-        // A. WEATHER DATA (Parallel)
-        const fetchWeather = async (lt, ln, name) => {
-            let searchLat = lt;
-            let searchLon = ln;
-
-            // If coordinates are missing but name exists, try geocoding
-            if ((!lt || !ln) && name) {
-                try {
-                    const geoRes = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`);
-                    if (geoRes.data && geoRes.data.length > 0) {
-                        searchLat = parseFloat(geoRes.data[0].lat);
-                        searchLon = parseFloat(geoRes.data[0].lon);
-                    }
-                } catch (e) {
-                    console.error("Geocoding failed for fallback name:", name);
-                }
-            }
-
-            // Default to Delhi if still no coords
-            searchLat = searchLat || 28.6139;
-            searchLon = searchLon || 77.2090;
-
-            console.log(`📡 Fetching weather for: ${name} (${searchLat}, ${searchLon})`);
-
-            return axios.get(
-                `https://api.openweathermap.org/data/2.5/weather?lat=${searchLat}&lon=${searchLon}&units=metric&appid=${process.env.OPENWEATHER_API_KEY}`
-            ).catch(() => null);
-        };
-
-        const weatherPromise = fetchWeather(lat, lon, locationName);
-
-        // B. GEMINI IMAGE ANALYSIS
-        const imagePart = {
-            inlineData: {
-                data: req.file.buffer.toString("base64"),
-                mimeType: req.file.mimetype
-            }
-        };
-
-        const prompt = `
-        CONTEXT: The plant is located in ${locationName}. 
-        REQUESTED LANGUAGE: ${req.body.language || "English"}.
-        Analyze this crop image and provide:
-        1. Disease identification (single name).
-        2. Description of the issue.
-        3. A short, bulleted treatment plan.
-        4. Severity Level (Critical, Major, Moderate, Low).
-        5. Confidence percentage of this diagnosis (0-100).
-        6. A specific 'spray' recommendation.
-        7. The 'action time' for the spray (e.g., Early morning, Evening).
-        8. The 'quantity' of spray to use (e.g., 2 ml/liter of water).
-        
-        INSTRUCTION: You MUST return all text fields (disease, description, treatment, spray, etc.) in the requested language (${req.body.language}).
-        Format your response as a valid JSON object ONLY:
-        {
-            "disease": "string",
-            "description": "string",
-            "treatment": ["step1", "step2"],
-            "severity": "string",
-            "confidence": number,
-            "spray": "string",
-            "spray_action_time": "string",
-            "spray_quantity": "string"
-        }`;
-
-        let aiData;
+        console.log(`\n📸 Analysis Request: [${req.file.originalname}]`);
+        const aiPromise = classify(req.file.buffer);
+        let weatherData = { temp: 25, condition: "Unknown", humidity: 55 };
         try {
-            const geminiResult = await geminiModel.generateContent({
-                contents: [{ role: "user", parts: [imagePart, { text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-            });
-            const geminiResponse = await geminiResult.response;
-            const rawJson = geminiResponse.text().replace(/```json|```/g, "").trim();
-            aiData = JSON.parse(rawJson);
-        } catch (geminiErr) {
-            console.error("❌ GEMINI ERROR:", geminiErr.message);
-
-            if (geminiErr.message.includes("429") || geminiErr.message.includes("quota")) {
-                return res.status(429).json({ error: "The AI is currently busy analyzing too many farms. Please wait a few minutes and try again!" });
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            const country = req.body.country || "Global";
+            const weatherRes = await axios.get(`https://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${country}`, { signal: controller.signal });
+            clearTimeout(timeout);
+            if (weatherRes.data && weatherRes.data.current) {
+                weatherData = { temp: weatherRes.data.current.temp_c, condition: weatherRes.data.current.condition.text, humidity: weatherRes.data.current.humidity };
             }
-            if (geminiErr.message.includes("blocked")) {
-                return res.status(400).json({ error: "Image blocked by safety filters. Please try another image." });
-            }
-            throw new Error("AI analysis failed: " + geminiErr.message);
-        }
-
-        // C. WEATHER INTEGRATION
-        const weatherRes = await weatherPromise;
-        const weather = weatherRes ? weatherRes.data : { main: { temp: 25, humidity: 60 }, wind: { speed: 5 } };
-
-        const temp = weather.main.temp;
-        const wind = weather.wind.speed;
-        const humidity = weather.main.humidity;
-
-        // LOG TO JSON DB
-        try {
-            db.addRecord({
-                disease: aiData.disease,
-                severity: aiData.severity,
-                confidence: aiData.confidence,
-                location: { lat, lon, name: locationName },
-                weather: { temp, humidity }
-            });
-        } catch (dbErr) {
-            console.error("📂 DB LOGGING ERROR:", dbErr.message);
-        }
-
-        // FINAL RESPONSE
-        res.json({
-            disease: aiData.disease,
-            description: aiData.description,
-            temperature: temp,
-            wind: wind,
-            humidity: humidity,
-            alert: aiData.severity + " Severity: " + (temp > 30 ? "🔥 Hot" : "🌤️ Normal"),
-            confidence: aiData.confidence || "Unknown",
-            severity: aiData.severity || "Unknown",
-            spray: aiData.spray || "Decision pending...",
-            spray_action_time: aiData.spray_action_time || "N/A",
-            spray_quantity: aiData.spray_quantity || "N/A",
-            advice: aiData.treatment
-        });
-
-    } catch (err) {
-        console.error("🚨 SERVER ERROR:", err.message);
-        res.status(500).json({ error: "Server Error: " + err.message });
-    }
+        } catch (e) { console.warn("   ⚠️  Weather Bypass active."); }
+        const result = await aiPromise;
+        res.json({ ...result, temperature: weatherData.temp, humidity: weatherData.humidity, alert: `Weather: ${weatherData.temp}°C, ${weatherData.condition}.`, timestamp: new Date().toISOString() });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. CONTEXT-AWARE CHATBOT Q&A
+// 2. CHAT ENGINE (Rule-based Knowledge Retrieval)
 app.post("/chat", async (req, res) => {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ error: "No question asked" });
+
     try {
-        const { question, history } = req.body;
-        console.log("💬 Chat request:", question);
+        console.log(`\n💬 Chat Query: "${question}"`);
+        const keywords = ["symptoms", "treatment", "medicine", "spray", "prevent", "soil"];
+        const matches = searchByKeyword(question);
 
-        // 1. Fetch Recent Crop Analysis Records for Context
-        const allRecords = db.readDB();
-        const userRecords = allRecords.slice(-3); // Get last 3 analyses
-        let contextKnowledge = "User's Recent Crop Analysis Records:\n";
-
-        if (userRecords.length > 0) {
-            userRecords.forEach((rec, idx) => {
-                contextKnowledge += `- Date: ${new Date(rec.timestamp).toLocaleDateString()}. Disease: ${rec.disease} (${rec.severity} severity). Weather: ${rec.weather.temp}°C, ${rec.weather.humidity}% humidity.\n`;
-            });
-        } else {
-            contextKnowledge += "No previous analysis records found.\n";
+        if (matches.length > 0) {
+            const top = matches[0];
+            let answer = `I found details for **${top.displayName}**. It is a ${top.causedBy.toLowerCase()} disease. `;
+            
+            if (question.toLowerCase().includes("treatment") || question.toLowerCase().includes("medicine") || question.toLowerCase().includes("spray")) {
+                answer += `Treat by using **${top.spray.name}** at a concentration of ${top.spray.quantity}. ${top.spray.timing}.`;
+            } else if (question.toLowerCase().includes("prevent")) {
+                answer += `Prevent future outbreaks by: ${top.prevention[0]} and ${top.prevention[1]}.`;
+            } else {
+                answer += `Common symptoms include ${top.symptoms[0]} and ${top.symptoms[1]}.`;
+            }
+            return res.json({ answer });
         }
 
-        // 2. Build personalized prompt with Grounding instructions
-        const augmentedPrompt = `
-        IMPORTANT CONTEXT:
-        ${contextKnowledge}
-        
-        USER QUESTION: ${question}
-        REQUESTED LANGUAGE: ${req.body.language || "English"}
-        
-        INSTRUCTION: Answer the user's question based on their history if relevant. 
-        MANDATORY: You MUST respond entirely in the requested language (${req.body.language}). 
-        If you mention any chemicals or treatments, ensure they are real and effective for the diseases listed above.`;
-
-        // 3. Request completion using history
-        const messages = [
-            { role: "system", content: systemInstruction },
-            ...(history || []),
-            { role: "user", content: augmentedPrompt }
+        // Generic Agri-Advice fallbacks
+        const generic = [
+            "Always ensure proper drainage to prevent fungal root rot.",
+            "Balanced N-P-K fertilizer is essential for crop immunity.",
+            "Water at the base of plants during the evening to keep leaves dry.",
+            "If you see yellowing, check for aphids or nutrient deficiency."
         ];
+        res.json({ answer: "I'm a local AI. Try asking about a specific crop name or treatment! " + generic[Math.floor(Math.random() * generic.length)] });
 
-        const groqResponse = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            messages: messages,
-            max_tokens: 800
-        });
-
-        const responseText = groqResponse.choices[0].message.content;
-
-        res.json({ answer: responseText });
-
-    } catch (err) {
-        console.error("CHAT ERROR:", err.message);
-        res.status(500).json({ error: "Chat system busy." });
-    }
+    } catch (err) { res.status(500).json({ error: "Brain error" }); }
 });
 
-// 3. RETRIEVE HISTORY
-app.get("/history", (req, res) => {
+// 3. HEALTH SENSOR
+app.get("/status", (req, res) => {
+    res.json({ ready: isReady(), status: isReady() ? "✅ AI NEURAL ENGINE ACTIVE!" : "⏳ Warming up...", engine: "WASM (SIMD Turbo)" });
+});
+
+// 4. GEOCODING PROXY
+app.get("/api/geocode", async (req, res) => {
+    const { lat, lon } = req.query;
     try {
-        const history = db.readDB();
-        res.json(history);
-    } catch (err) {
-        res.status(500).json({ error: "Could not read history." });
-    }
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+        const response = await axios.get(url, { headers: { 'User-Agent': 'AgriAI/1.0' }, timeout: 5000 });
+        res.json({ address: response.data.display_name || "Detected Location" });
+    } catch (err) { res.json({ address: `📍 [${parseFloat(lat).toFixed(2)}, ${parseFloat(lon).toFixed(2)}]` }); }
 });
 
 // 4. GOVT SCHEMES (Basic Data + Live Links)
@@ -257,16 +107,11 @@ app.get("/schemes", (req, res) => {
     }
 });
 
-
+// ═══════════════════════════════════════════════
+//  START SERVER
+// ═══════════════════════════════════════════════
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`🚀 Agri-AI Server ready at http://127.0.0.1:${PORT}`);
-});
-
-server.on('error', (err) => {
-    console.error("🚨 CRITICAL ERROR:", err.message);
-    if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use! Another server is already running in the background.`);
-        console.error(`❌ Please close the other terminal or restart VS Code.`);
-    }
+    initClassifier().catch(err => console.error("   ❌ Initializer Failed:", err.message));
 });

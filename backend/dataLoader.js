@@ -165,4 +165,70 @@ function shuffleArray(arr) {
     return shuffled;
 }
 
-module.exports = { loadDataset, splitDataset, imageToTensor, bufferToTensor, IMAGE_SIZE };
+/**
+ * Load images class-by-class and extract features on-the-fly to save RAM.
+ * This prevents OOM errors on large datasets (10k+ images).
+ */
+async function loadAndExtractFeatures(datasetPath, classLabels, mobilenet, maxPerClass = 200) {
+    const allFeatures = [];
+    const allLabels = [];
+    const numClasses = classLabels.length;
+    let totalLoaded = 0;
+
+    console.log(`\n📂 Streaming dataset from: ${datasetPath}`);
+    console.log(`🧠 Extraction Engine: MobileNet V2 (Frozen)`);
+
+    for (let classIdx = 0; classIdx < classLabels.length; classIdx++) {
+        const className = classLabels[classIdx];
+        const classDir = path.join(datasetPath, className);
+
+        if (!fs.existsSync(classDir)) continue;
+
+        let files = fs.readdirSync(classDir)
+            .filter(f => /\.(jpg|jpeg|png|bmp)$/i.test(f));
+
+        files = shuffleArray(files).slice(0, maxPerClass);
+
+        // Process in small micro-batches to balance speed and memory
+        const MICRO_BATCH_SIZE = 20; 
+        for (let i = 0; i < files.length; i += MICRO_BATCH_SIZE) {
+            const batchFiles = files.slice(i, i + MICRO_BATCH_SIZE);
+            
+            const batchTensors = await Promise.all(
+                batchFiles.map(file => imageToTensor(path.join(classDir, file)))
+            );
+
+            // Stack micro-batch and predict features
+            const features = tf.tidy(() => {
+                const stacked = tf.stack(batchTensors);
+                return mobilenet.predict(stacked);
+            });
+
+            // Store features and labels
+            const featureArray = await features.array();
+            featureArray.forEach(feat => {
+                allFeatures.push(feat);
+                const oneHot = new Array(numClasses).fill(0);
+                oneHot[classIdx] = 1;
+                allLabels.push(oneHot);
+            });
+
+            // Cleanup
+            features.dispose();
+            batchTensors.forEach(t => t.dispose());
+
+            totalLoaded += batchFiles.length;
+            process.stdout.write(`\r   ⚡ Processing: ${totalLoaded} images...`);
+        }
+        console.log(`  ✅ [${classIdx + 1}/${numClasses}] ${className}`);
+    }
+
+    console.log(`\n\n📊 Final Collection: ${totalLoaded} feature vectors ready.`);
+    
+    const featuresTensor = tf.tensor2d(allFeatures);
+    const labelsTensor = tf.tensor2d(allLabels);
+
+    return { features: featuresTensor, labels: labelsTensor, totalImages: totalLoaded };
+}
+
+module.exports = { loadDataset, splitDataset, imageToTensor, bufferToTensor, loadAndExtractFeatures, IMAGE_SIZE };

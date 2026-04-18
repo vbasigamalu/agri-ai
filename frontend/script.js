@@ -17,26 +17,61 @@ const loginError = document.getElementById("loginError");
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 
-// Automatic login check removed to ensure the app starts on the login page every time.
-// --- Login Logic ---
+// Persistence check on page load
+async function checkAuth() {
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    const savedInstanceId = localStorage.getItem("serverInstanceId");
+
+    if (isLoggedIn === "true") {
+        try {
+            const res = await fetch(`${API_BASE_URL}/status`);
+            const data = await res.json();
+            
+            // If server restarted (new instanceId), force a logout/re-login as requested
+            if (savedInstanceId && data.instanceId !== savedInstanceId) {
+                console.log("🔄 Server restarted. Re-authentication required.");
+                logout();
+                return;
+            }
+            
+            // If match or first time, stay logged in
+            localStorage.setItem("serverInstanceId", data.instanceId);
+            showMainApp();
+        } catch (err) {
+            console.warn("⚠️ Could not verify server status. Keeping offline session.");
+            showMainApp();
+        }
+    }
+}
+
+checkAuth();
 
 loginBtn.addEventListener("click", () => {
     const user = usernameInput.value;
     const pass = passwordInput.value;
 
-    // Simple demo credentials - in real app, these should be checked via backend
     if (user === "vishnu" && pass === "123456") {
         localStorage.setItem("isLoggedIn", "true");
-        showMainApp();
+        // Get current instance ID to lock the session to this server boot
+        fetch(`${API_BASE_URL}/status`)
+            .then(res => res.json())
+            .then(data => {
+                localStorage.setItem("serverInstanceId", data.instanceId);
+                showMainApp();
+            })
+            .catch(() => showMainApp());
     } else {
         loginError.innerText = "❌ Invalid Farmer ID or Password";
     }
 });
 
-logoutBtn.addEventListener("click", () => {
+logoutBtn.addEventListener("click", logout);
+
+function logout() {
     localStorage.removeItem("isLoggedIn");
-    location.reload(); // Simple way to reset everything
-});
+    localStorage.removeItem("serverInstanceId");
+    location.reload();
+}
 
 function showMainApp() {
     loginSection.classList.add("hidden");
@@ -167,8 +202,15 @@ analyzeBtn.addEventListener("click", async () => {
             statusMsg.innerText = "✅ Analysis complete! (Local ML — No API)";
             document.querySelector(".results").scrollIntoView({ behavior: 'smooth' });
 
-            // Add the analysis result to chat context
-            addChatMessage("bot", `I've analyzed your crop using local ML. Disease detected: ${data.disease}. ${data.description} Ask me for treatment details or prevention tips!`);
+            const botMsg = `I've analyzed your crop using local ML. Disease detected: ${data.disease}. ${data.description || ""} Ask me for treatment details or prevention tips!`;
+            addChatMessage("bot", botMsg);
+
+            // Push system context to chatHistory for the AI API
+            chatHistory.push({
+                role: "system",
+                content: `The user just scanned a crop image. The local Agri-AI model detected: ${data.disease}. Severity: ${data.severity}. Symptoms: ${(data.symptoms || []).join(", ")}. Expert knowledge base: ${(data.advice || []).join(", ")}. Suggested Spray: ${data.spray} (Quantity: ${data.spray_quantity}, Timing: ${data.spray_action_time}). Weather: ${data.temperature}°C, ${data.humidity}% humidity. Respond in language: \${getCurrentLanguage()}. Give a concise and helpful response as an expert agricultural AI assistant.`
+            });
+            chatHistory.push({ role: "assistant", content: botMsg });
 
         } catch (err) {
             console.error("FETCH ERROR:", err);
@@ -552,42 +594,286 @@ tabBtns.forEach(btn => {
         const targetId = btn.getAttribute('data-target');
         document.getElementById(targetId).classList.remove('hidden');
 
-        // Load schemes if schemes tab clicked
+        // Initialize scheme advisor if schemes tab clicked
         if (targetId === 'schemesTab') {
-            loadSchemes();
+            initSchemeAdvisor();
+        }
+
+        // Load History if history tab clicked
+        if (targetId === 'historyTab') {
+            loadHistory();
         }
     });
 });
 
-// --- Schemes Logic ---
-async function loadSchemes() {
-    const grid = document.getElementById('schemesGrid');
-    
-    // Only load if it's currently showing "Loading..." to avoid redundant fetches
-    if (grid.innerHTML.includes('Loading schemes')) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/schemes`);
-            const schemes = await response.json();
-            
-            grid.innerHTML = ''; // Clear loading text
-            
-            schemes.forEach(scheme => {
-                const card = document.createElement('div');
-                card.className = 'scheme-card';
-                card.innerHTML = `
-                    <h3>📌 ${scheme.name}</h3>
-                    <div class="scheme-target">Target: ${scheme.target}</div>
-                    <div class="scheme-summary">${scheme.summary}</div>
-                    <div class="scheme-eligibility"><strong>Eligibility:</strong> ${scheme.eligibility}</div>
-                    <a href="${scheme.officialUrl}" target="_blank" rel="noopener noreferrer" class="scheme-link">
-                        🌐 Visit Official Platform
-                    </a>
-                `;
-                grid.appendChild(card);
-            });
-        } catch (err) {
-            console.error("Error loading schemes:", err);
-            grid.innerHTML = '<p style="color:var(--danger)">❌ Failed to load schemes. Make sure backend is running.</p>';
+async function loadHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = `
+        <div class="sa-loading" style="grid-column: 1 / -1;">
+            <div class="sa-dots"><span></span><span></span><span></span></div>
+            <p>Gathering your past scans from MongoDB Atlas...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/history`);
+        const data = await res.json();
+
+        if (data.length === 0) {
+            list.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 3rem;">No scan history found yet. Try analyzing a crop first!</p>`;
+            return;
         }
+
+        list.innerHTML = '';
+        data.forEach(item => {
+            const date = new Date(item.timestamp).toLocaleString();
+            const confidence = Math.round(item.confidence);
+            const badgeClass = confidence > 80 ? 'badge-high' : 'badge-low';
+            
+            const card = document.createElement('div');
+            card.className = 'history-card';
+            card.innerHTML = `
+                <div class="history-header">
+                    <span class="history-date">📅 ${date}</span>
+                    <span class="history-badge ${badgeClass}">${confidence}% Match</span>
+                </div>
+                <strong class="history-disease">${item.diseaseName}</strong>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">${item.alert || ''}</p>
+                <div class="history-stats">
+                    <div class="history-stat-item">🌡️ <span>${item.temperature}°C</span></div>
+                    <div class="history-stat-item">💧 <span>${item.humidity}%</span></div>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    } catch (err) {
+        list.innerHTML = `<p style="color: var(--danger); text-align: center; grid-column: 1 / -1;">Failed to load history. Check if MongoDB is connected.</p>`;
     }
+}
+
+// ═══════════════════════════════════════════════
+// SCHEME ADVISOR — AI-Powered Dynamic Fetch
+// ═══════════════════════════════════════════════
+let saHistory = []; // Conversation history for follow-ups
+let saInitialized = false;
+
+function initSchemeAdvisor() {
+    if (saInitialized) return;
+    saInitialized = true;
+
+    const saInput = document.getElementById('saInput');
+    const saSearchBtn = document.getElementById('saSearchBtn');
+    const saMicBtn = document.getElementById('saMicBtn');
+
+    // Search button — handles both new queries and follow-ups
+    saSearchBtn.addEventListener('click', () => {
+        const q = saInput.value.trim();
+        if (q) sendSchemeQuery(q);
+    });
+
+    // Enter key on main input
+    saInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const q = saInput.value.trim();
+            if (q) sendSchemeQuery(q);
+        }
+    });
+
+    // Example suggestion chips (reset history for fresh topic)
+    document.querySelectorAll('.sa-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const q = chip.getAttribute('data-query');
+            saInput.value = q;
+            saHistory = []; // Fresh search from chip
+            sendSchemeQuery(q);
+        });
+    });
+
+    // Voice input for scheme advisor
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+        const saRecognition = new SpeechRec();
+        saRecognition.continuous = false;
+        saRecognition.interimResults = true;
+        saRecognition.maxAlternatives = 1;
+
+        saMicBtn.addEventListener('click', () => {
+            try {
+                const currentLang = getCurrentLanguage();
+                const langCodes = {
+                    "English": "en-IN", "english": "en-IN", "en": "en-IN",
+                    "Hindi": "hi-IN", "हिंदी": "hi-IN", "hi": "hi-IN",
+                    "Marathi": "mr-IN", "मराठी": "mr-IN", "mr": "mr-IN",
+                    "Punjabi": "pa-IN", "ਪੰਜਾਬੀ": "pa-IN", "pa": "pa-IN",
+                    "Bengali": "bn-IN", "বাংলা": "bn-IN", "bn": "bn-IN",
+                    "Telugu": "te-IN", "తెలుగు": "te-IN", "te": "te-IN",
+                    "Tamil": "ta-IN", "தமிழ்": "ta-IN", "ta": "ta-IN",
+                    "Kannada": "kn-IN", "ಕನ್ನಡ": "kn-IN", "kn": "kn-IN",
+                    "Malayalam": "ml-IN", "മലയാളം": "ml-IN", "ml": "ml-IN",
+                    "Gujarati": "gu-IN", "ગુજરાતી": "gu-IN", "gu": "gu-IN"
+                };
+                saRecognition.lang = langCodes[currentLang] || "en-IN";
+                saRecognition.start();
+                saMicBtn.classList.add('recording');
+                saInput.placeholder = "🎤 Listening... Speak now!";
+            } catch (err) { console.warn("SA mic error:", err); }
+        });
+
+        saRecognition.onresult = (event) => {
+            let transcript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            saInput.value = transcript;
+        };
+
+        saRecognition.onend = () => {
+            saMicBtn.classList.remove('recording');
+            saInput.placeholder = "e.g. I have 2 acres land in Maharashtra...";
+            // Auto-search after voice input completes
+            const q = saInput.value.trim();
+            if (q) sendSchemeQuery(q);
+        };
+
+        saRecognition.onerror = (event) => {
+            console.error("SA Speech Error:", event.error);
+            saMicBtn.classList.remove('recording');
+            saInput.placeholder = "e.g. I have 2 acres land in Maharashtra...";
+        };
+    } else {
+        saMicBtn.style.display = 'none';
+    }
+}
+
+async function sendSchemeQuery(queryText) {
+    const loading = document.getElementById('saLoading');
+    const response = document.getElementById('saResponse');
+
+    loading.classList.remove('hidden');
+    response.classList.add('hidden');
+
+    try {
+        const currentLang = getCurrentLanguage();
+        const res = await fetch(`${API_BASE_URL}/api/scheme-advisor`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: queryText,
+                history: saHistory,
+                language: currentLang
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            // Handle Groq rate limit specifically
+            if (data.error && data.error.includes("rate_limit_exceeded")) {
+                throw new Error("AI is currently very busy. ⏳ Please wait 60 seconds and try again!");
+            }
+            throw new Error(data.error || "Server error");
+        }
+
+        // Append to history for follow-up context
+        saHistory.push({ role: "user", content: queryText });
+        saHistory.push({ role: "assistant", content: JSON.stringify(data) });
+
+        renderSchemeResults(data);
+        // Clear input after successful search
+        document.getElementById('saInput').value = '';
+    } catch (err) {
+        console.error("Scheme Advisor Error:", err);
+        loading.classList.add('hidden');
+        response.classList.remove('hidden');
+        
+        // Show the error message in the UI more cleanly
+        document.getElementById('saAiMessage').innerText = "🛑 " + err.message;
+        document.getElementById('saSchemesList').innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                <button onclick="document.getElementById('saInput').focus()" class="mini-btn">Try again in a moment</button>
+            </div>
+        `;
+    }
+}
+
+function renderSchemeResults(data) {
+    const loading = document.getElementById('saLoading');
+    const response = document.getElementById('saResponse');
+
+    loading.classList.add('hidden');
+    response.classList.remove('hidden');
+
+    // AI Message
+    document.getElementById('saAiMessage').innerText = data.aiMessage || "Here are the schemes I found for you:";
+
+    // User Context
+    const ctx = data.userContext || {};
+    document.getElementById('saCtxLocation').innerText = ctx.location || "—";
+    document.getElementById('saCtxLand').innerText = ctx.landSize || "—";
+    document.getElementById('saCtxCategory').innerText = ctx.farmerCategory || "—";
+    document.getElementById('saCtxCrop').innerText = ctx.cropType || "—";
+
+    // Eligibility Meter (animated)
+    const score = Math.min(100, Math.max(0, data.eligibilityScore || 0));
+    document.getElementById('saScoreText').innerText = score + '%';
+    // Delay for animation effect
+    setTimeout(() => {
+        document.getElementById('saScoreBar').style.width = score + '%';
+    }, 100);
+
+    // Scheme Cards
+    const list = document.getElementById('saSchemesList');
+    list.innerHTML = '';
+
+    if (data.schemes && data.schemes.length > 0) {
+        data.schemes.forEach(scheme => {
+            const statusMap = {
+                'eligible': { label: '✔ Eligible', cls: 'sa-badge-eligible' },
+                'maybe': { label: '⚠ Maybe Eligible', cls: 'sa-badge-maybe' },
+                'not_eligible': { label: '✘ Not Eligible', cls: 'sa-badge-not' }
+            };
+            const st = statusMap[scheme.status] || statusMap['maybe'];
+
+            // Benefits pills
+            const benefitsHTML = (scheme.benefits || []).map(b =>
+                `<span class="sa-benefit-pill">${b}</span>`
+            ).join('');
+
+            const card = document.createElement('div');
+            card.className = 'sa-scheme-card';
+            card.innerHTML = `
+                <div class="sa-scheme-top">
+                    <div>
+                        <div class="sa-scheme-name">${scheme.name}</div>
+                        ${scheme.category ? `<span class="sa-scheme-category-tag">${scheme.category}</span>` : ''}
+                    </div>
+                    <span class="sa-badge ${st.cls}">${st.label}</span>
+                </div>
+                <div class="sa-scheme-benefit">${scheme.benefitSummary || ''}</div>
+                ${benefitsHTML ? `<div class="sa-benefits-row">${benefitsHTML}</div>` : ''}
+                <div class="sa-reason">
+                    <strong>🧠 Why this scheme</strong>
+                    ${scheme.reason || ''}
+                </div>
+                <div class="sa-actions">
+                    <a href="${scheme.applyUrl || scheme.officialUrl || '#'}" target="_blank" rel="noopener noreferrer" class="sa-btn-apply">Apply Now</a>
+                    <a href="${scheme.officialUrl || '#'}" target="_blank" rel="noopener noreferrer" class="sa-btn-details">View Details</a>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    } else {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No schemes found. Try a different query or provide more details about your situation.</p>';
+    }
+
+    // Follow-up question
+    const followUpQ = document.getElementById('saFollowUpQ');
+    if (data.followUpQuestion) {
+        followUpQ.innerText = '🤖 ' + data.followUpQuestion;
+    } else {
+        followUpQ.innerText = '🤖 Want to refine your results? Tell me more about your situation.';
+    }
+
+    // Scroll to response
+    response.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

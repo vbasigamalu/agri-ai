@@ -1035,3 +1035,34 @@ li {
 
 .badge-high { background: rgba(16, 185, 129, 0.1); color: var(--primary-light); }
 .badge-low { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+/* Scheme Browse Styles */
+.sa-browse-container {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.sa-full-list {
+    margin-top: 2rem;
+    animation: saFadeIn 0.5s ease-out;
+}
+
+.sa-full-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.sa-count-badge {
+    background: var(--primary);
+    color: #064e3b;
+    padding: 0.2rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}

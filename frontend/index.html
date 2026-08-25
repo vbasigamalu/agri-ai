@@ -67,7 +67,6 @@
 
         <div class="tabs-container">
             <button class="tab-btn active" data-target="advisorTab">Smart Advisor</button>
-            <button class="tab-btn" data-target="schemesTab">Govt Schemes</button>
             <button class="tab-btn" data-target="historyTab" id="loadHistoryBtn">My History</button>
         </div>
 
@@ -190,96 +189,6 @@
             </div>
         </div>
 
-        <div id="schemesTab" class="tab-content hidden">
-            <!-- Scheme Advisor Input Section -->
-            <div class="sa-input-section">
-                <h3 class="sa-title">🏛️ AI Scheme Finder</h3>
-                <p class="sa-subtitle">Tell us about yourself — we'll find the best government schemes for you</p>
-                <div class="sa-input-row">
-                    <input type="text" id="saInput" placeholder="e.g. I have 2 acres land in Maharashtra...">
-                    <button type="button" id="saMicBtn" class="sa-mic-btn">🎙️</button>
-                    <button type="button" id="saSearchBtn" class="sa-search-btn">Find Schemes</button>
-                </div>
-                <div class="sa-suggestions">
-                    <span class="sa-chip" data-query="Schemes for small farmers in Maharashtra">🌾 Small farmers in Maharashtra</span>
-                    <span class="sa-chip" data-query="I have 2 acres land and grow wheat">🌿 2 acres, wheat farmer</span>
-                    <span class="sa-chip" data-query="Crop insurance schemes for rainy season">🌧️ Crop insurance</span>
-                    <span class="sa-chip" data-query="Solar pump subsidy for farmers">☀️ Solar pump subsidy</span>
-                    <span class="sa-chip" data-query="Loans and credit schemes for farmers">💳 Farm loans & credit</span>
-                    <span class="sa-chip" data-query="Schemes for women farmers">👩‍🌾 Women farmer schemes</span>
-                </div>
-            </div>
-
-            <!-- Loading State -->
-            <div id="saLoading" class="sa-loading hidden">
-                <div class="sa-dots">
-                    <span></span><span></span><span></span>
-                </div>
-                <p>🤖 Analyzing your profile & finding best schemes...</p>
-            </div>
-
-            <!-- AI Response Container (hidden until query) -->
-            <div id="saResponse" class="sa-response hidden">
-                <!-- AI Header Message -->
-                <div class="sa-ai-header">
-                    <span class="sa-ai-avatar">🤖</span>
-                    <div>
-                        <strong>Smart Scheme Advisor</strong>
-                        <p id="saAiMessage" class="sa-ai-text"></p>
-                    </div>
-                </div>
-
-                <!-- User Context Card -->
-                <div class="sa-context-card">
-                    <h4>📌 Your Profile (AI-Detected)</h4>
-                    <div class="sa-context-grid">
-                        <div class="sa-context-item">
-                            <span class="sa-context-icon">📍</span>
-                            <div><small>Location</small><strong id="saCtxLocation">—</strong></div>
-                        </div>
-                        <div class="sa-context-item">
-                            <span class="sa-context-icon">🌾</span>
-                            <div><small>Land Size</small><strong id="saCtxLand">—</strong></div>
-                        </div>
-                        <div class="sa-context-item">
-                            <span class="sa-context-icon">👨‍🌾</span>
-                            <div><small>Category</small><strong id="saCtxCategory">—</strong></div>
-                        </div>
-                        <div class="sa-context-item">
-                            <span class="sa-context-icon">🌿</span>
-                            <div><small>Crop</small><strong id="saCtxCrop">—</strong></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Eligibility Meter -->
-                <div class="sa-meter-section">
-                    <div class="sa-meter-header">
-                        <span>📊 Overall Eligibility Score</span>
-                        <strong id="saScoreText">0%</strong>
-                    </div>
-                    <div class="sa-meter-track">
-                        <div id="saScoreBar" class="sa-meter-fill" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- Recommended Schemes Grid -->
-                <h4 class="sa-section-title">📋 Recommended Schemes</h4>
-                <div id="saSchemesList" class="sa-schemes-list"></div>
-
-                <!-- Follow-up Hint -->
-                <div class="sa-followup">
-                    <p id="saFollowUpQ" class="sa-followup-text"></p>
-                    <p class="sa-followup-hint">👆 Type your answer in the search bar above and click "Find Schemes" again</p>
-                </div>
-
-                <!-- Disclaimer -->
-                <div class="sa-disclaimer">
-                    <span>⚠️</span>
-                    <p>This information is AI-generated based on publicly available scheme data. Please verify all details on official government websites before applying. Eligibility may vary based on state-specific rules.</p>
-                </div>
-            </div>
-        </div>
 
         <div id="historyTab" class="tab-content hidden">
             <div class="history-container">

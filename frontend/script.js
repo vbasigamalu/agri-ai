@@ -8,75 +8,204 @@ let stream = null;
 let capturedFile = null;
 let currentFacingMode = "environment"; // Default to back camera
 
-// --- Login Logic ---
+// --- Helper to attach JWT token to all API calls ---
+function getAuthHeaders(extraHeaders = {}) {
+    const token = localStorage.getItem("agri_ai_token");
+    const headers = { ...extraHeaders };
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
+// --- DOM Elements for Auth ---
 const loginSection = document.getElementById("loginSection");
 const mainContent = document.getElementById("mainContent");
-const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
-const loginError = document.getElementById("loginError");
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
+const userProfileBadge = document.getElementById("userProfileBadge");
+const loggedUserName = document.getElementById("loggedUserName");
+const loggedUserLocation = document.getElementById("loggedUserLocation");
 
-// Persistence check on page load
+const tabLoginBtn = document.getElementById("tabLoginBtn");
+const tabRegisterBtn = document.getElementById("tabRegisterBtn");
+const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
+const authMessage = document.getElementById("authMessage");
+
+let currentUser = null;
+
+// Switch to Login Tab
+tabLoginBtn.addEventListener("click", () => {
+    tabLoginBtn.classList.add("active");
+    tabRegisterBtn.classList.remove("active");
+    loginForm.classList.remove("hidden");
+    registerForm.classList.add("hidden");
+    authMessage.innerText = "";
+});
+
+// Switch to Register Tab
+tabRegisterBtn.addEventListener("click", () => {
+    tabRegisterBtn.classList.add("active");
+    tabLoginBtn.classList.remove("active");
+    registerForm.classList.remove("hidden");
+    loginForm.classList.add("hidden");
+    authMessage.innerText = "";
+});
+
+// --- Handle Farmer Login (POST /api/auth/login) ---
+loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authMessage.innerText = "⏳ Authenticating (तपासत आहे)...";
+    authMessage.className = "auth-status-msg";
+
+    const phone_or_email = document.getElementById("loginIdentifier").value.trim();
+    const password = document.getElementById("loginPassword").value;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone_or_email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            authMessage.innerText = `❌ ${data.error || "Login failed"}`;
+            authMessage.className = "auth-status-msg error";
+            return;
+        }
+
+        // Save JWT & user profile
+        localStorage.setItem("agri_ai_token", data.token);
+        localStorage.setItem("agri_ai_user", JSON.stringify(data.user));
+        currentUser = data.user;
+
+        authMessage.innerText = "✅ Login successful (लॉगिन यशस्वी)!";
+        authMessage.className = "auth-status-msg success";
+
+        setTimeout(() => {
+            showMainApp(currentUser);
+        }, 400);
+
+    } catch (err) {
+        console.error("Login Exception:", err);
+        authMessage.innerText = "❌ Server error. Check database/connection.";
+        authMessage.className = "auth-status-msg error";
+    }
+});
+
+// --- Handle Farmer Registration (POST /api/auth/register) ---
+registerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authMessage.innerText = "⏳ Creating account (खाते तयार करत आहे)...";
+    authMessage.className = "auth-status-msg";
+
+    const name = document.getElementById("regName").value.trim();
+    const phone_or_email = document.getElementById("regIdentifier").value.trim();
+    const password = document.getElementById("regPassword").value;
+    const district = document.getElementById("regDistrict").value.trim();
+    const village = document.getElementById("regVillage").value.trim();
+    const role = document.getElementById("regRole").value;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name,
+                phone_or_email,
+                password,
+                district,
+                village,
+                role,
+                preferred_language: "mr"
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            authMessage.innerText = `❌ ${data.error || "Registration failed"}`;
+            authMessage.className = "auth-status-msg error";
+            return;
+        }
+
+        // Save JWT & user profile
+        localStorage.setItem("agri_ai_token", data.token);
+        localStorage.setItem("agri_ai_user", JSON.stringify(data.user));
+        currentUser = data.user;
+
+        authMessage.innerText = "✨ Account created successfully!";
+        authMessage.className = "auth-status-msg success";
+
+        setTimeout(() => {
+            showMainApp(currentUser);
+        }, 400);
+
+    } catch (err) {
+        console.error("Register Exception:", err);
+        authMessage.innerText = "❌ Registration error. Check connection.";
+        authMessage.className = "auth-status-msg error";
+    }
+});
+
+// --- Check Session on Page Load (JWT Verification) ---
 async function checkAuth() {
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const savedInstanceId = localStorage.getItem("serverInstanceId");
+    const token = localStorage.getItem("agri_ai_token");
+    const savedUserStr = localStorage.getItem("agri_ai_user");
 
-    if (isLoggedIn === "true") {
-        try {
-            const res = await fetch(`${API_BASE_URL}/status`);
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (res.ok) {
             const data = await res.json();
-            
-            // If server restarted (new instanceId), force a logout/re-login as requested
-            if (savedInstanceId && data.instanceId !== savedInstanceId) {
-                console.log("🔄 Server restarted. Re-authentication required.");
-                logout();
-                return;
-            }
-            
-            // If match or first time, stay logged in
-            localStorage.setItem("serverInstanceId", data.instanceId);
-            showMainApp();
-        } catch (err) {
-            console.warn("⚠️ Could not verify server status. Keeping offline session.");
-            showMainApp();
+            currentUser = data.user;
+            localStorage.setItem("agri_ai_user", JSON.stringify(currentUser));
+            showMainApp(currentUser);
+        } else {
+            // Token expired or invalid
+            logout();
+        }
+    } catch (err) {
+        console.warn("⚠️ Offline or connection check, using cached user if present");
+        if (savedUserStr) {
+            currentUser = JSON.parse(savedUserStr);
+            showMainApp(currentUser);
         }
     }
 }
 
 checkAuth();
 
-loginBtn.addEventListener("click", () => {
-    const user = usernameInput.value;
-    const pass = passwordInput.value;
-
-    if (user === "vishnu" && pass === "123456") {
-        localStorage.setItem("isLoggedIn", "true");
-        // Get current instance ID to lock the session to this server boot
-        fetch(`${API_BASE_URL}/status`)
-            .then(res => res.json())
-            .then(data => {
-                localStorage.setItem("serverInstanceId", data.instanceId);
-                showMainApp();
-            })
-            .catch(() => showMainApp());
-    } else {
-        loginError.innerText = "❌ Invalid Farmer ID or Password";
-    }
-});
-
+// --- Logout ---
 logoutBtn.addEventListener("click", logout);
 
 function logout() {
+    localStorage.removeItem("agri_ai_token");
+    localStorage.removeItem("agri_ai_user");
     localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("serverInstanceId");
     location.reload();
 }
 
-function showMainApp() {
+function showMainApp(user) {
     loginSection.classList.add("hidden");
     mainContent.classList.remove("hidden");
     logoutBtn.classList.remove("hidden");
+    
+    if (user) {
+        userProfileBadge.classList.remove("hidden");
+        const roleIcons = { farmer: "👨‍🌾", officer: "🏛️", expert: "🔬" };
+        const roleIcon = roleIcons[user.role] || "👨‍🌾";
+        loggedUserName.innerText = `${roleIcon} ${user.name}`;
+        
+        const loc = [user.village, user.district, user.state || "Maharashtra"].filter(Boolean).join(", ");
+        loggedUserLocation.innerText = loc || "शेतकरी (Farmer)";
+    }
 }
 
 // --- Main App Logic ---
@@ -114,6 +243,7 @@ analyzeBtn.addEventListener("click", async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/analyze`, {
                 method: "POST",
+                headers: getAuthHeaders(),
                 body: formData
             });
 
@@ -124,8 +254,17 @@ analyzeBtn.addEventListener("click", async () => {
                 throw new Error(data.error || "Server error");
             }
 
-            document.getElementById("disease").innerText = data.disease;
-            document.getElementById("confidence").innerText = data.confidence + "%";
+            if (data.status === "uncertain" && data.closestMatch && data.closestMatch.disease) {
+                document.getElementById("disease").innerText = `${data.disease} (Closest: ${data.closestMatch.disease})`;
+            } else {
+                document.getElementById("disease").innerText = data.disease;
+            }
+            const displayConf = data.confidencePercent !== undefined
+                ? data.confidencePercent
+                : (typeof data.confidence === "number" && data.confidence <= 1 && data.confidence > 0
+                    ? (data.confidence * 100).toFixed(1)
+                    : data.confidence);
+            document.getElementById("confidence").innerText = displayConf + "%";
             document.getElementById("severity").innerText = data.severity;
             document.getElementById("sprayDecision").innerText = data.spray;
             document.getElementById("sprayActionTime").innerText = data.spray_action_time;
@@ -199,11 +338,16 @@ analyzeBtn.addEventListener("click", async () => {
                 });
             }
 
-            statusMsg.innerText = "✅ Analysis complete! (Local ML — No API)";
-            document.querySelector(".results").scrollIntoView({ behavior: 'smooth' });
-
-            const botMsg = `I've analyzed your crop using local ML. Disease detected: ${data.disease}. ${data.description || ""} Ask me for treatment details or prevention tips!`;
-            addChatMessage("bot", botMsg);
+            let botMsg = "";
+            if (data.valid === false) {
+                statusMsg.innerText = `⚠️ Image Quality Issue: ${data.recommendation}`;
+                botMsg = `⚠️ I could not analyze this crop because the image quality is too low (${(data.issues || []).join(", ")}). Recommendation: ${data.recommendation}`;
+                addChatMessage("bot", botMsg);
+            } else {
+                statusMsg.innerText = "✅ Analysis complete! (Local ML — No API)";
+                botMsg = `I've analyzed your crop using local ML. Disease detected: ${data.disease}. ${data.description || ""} Ask me for treatment details or prevention tips!`;
+                addChatMessage("bot", botMsg);
+            }
 
             // Push context into history as a user+assistant exchange (NOT 'system')
             // Groq/OpenAI APIs reject 'system' role messages anywhere except position 0
@@ -398,7 +542,7 @@ async function sendChat() {
         const currentLang = getCurrentLanguage();
         const response = await fetch(`${API_BASE_URL}/chat`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 question: text,
                 history: chatHistory,
@@ -617,7 +761,9 @@ async function loadHistory() {
     `;
 
     try {
-        const res = await fetch(`${API_BASE_URL}/history`);
+        const res = await fetch(`${API_BASE_URL}/history`, {
+            headers: getAuthHeaders()
+        });
         const data = await res.json();
 
         if (data.length === 0) {

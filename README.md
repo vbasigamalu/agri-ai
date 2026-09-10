@@ -12,6 +12,17 @@ Agri-AI is a high-performance, full-stack web application designed to help farme
 
 ## 🚀 How to Run the Website
 
+### ⚡ Quick Start (Windows)
+Simply double-click **`start.bat`** in the project root folder. It will:
+1. Verify your Node.js installation.
+2. Automatically run `npm install` if required.
+3. Start the Agri-AI server.
+4. Launch your browser automatically to `http://localhost:5000`.
+
+---
+
+### 💻 Manual Start
+
 ### 1. Prerequisites
 Ensure you have the following installed on your machine:
 *   [Node.js](https://nodejs.org/) (Version 16 or higher recommended)

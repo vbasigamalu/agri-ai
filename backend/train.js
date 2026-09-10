@@ -26,12 +26,15 @@ const { getModelLabels } = require("./cropDatabase");
 
 // ─── Configuration ──────────────────────────────────────────
 const DATASET_PATH = path.join(__dirname, "dataset");
+const TARGET_CROP = "Tomato"; // Train only Tomato crop classes
 const EPOCHS = 30;
 const BATCH_SIZE = 16;
-const LEARNING_RATE = 0.0005; // Lower for stable fine-tuning
-const MAX_IMAGES_PER_CLASS = 400;
+const LEARNING_RATE = 0.0005; // Stable fine-tuning
+const MAX_IMAGES_PER_CLASS = 900; // 900 images per class
 const VALIDATION_SPLIT = 0.2;
 
+const MOBILENET_DIR = path.join(__dirname, "mobilenet_v2");
+const MOBILENET_LOCAL = path.join(MOBILENET_DIR, "model.json");
 const MOBILENET_URL = "https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/feature_vector/3/default/1";
 
 /**
@@ -61,14 +64,19 @@ function createNewModel(featureSize, numClasses) {
 async function train() {
     console.log("╔══════════════════════════════════════════════════╗");
     console.log("║   🌾 Agri-AI — Crop Disease Model Training       ║");
-    console.log("║   Transfer Learning + FINE-TUNING Mode           ║");
+    console.log(`║   Target Crop: ${TARGET_CROP.padEnd(33)} ║`);
+    console.log(`║   Images/Class: ${String(MAX_IMAGES_PER_CLASS).padEnd(32)} ║`);
     console.log("║   Memory-Safe Streaming Extraction               ║");
     console.log("╚══════════════════════════════════════════════════╝\n");
 
-    // 1. Get class labels
-    const classLabels = getModelLabels();
+    // 1. Get class labels (Filtered for Target Crop)
+    let classLabels = getModelLabels();
+    if (TARGET_CROP) {
+        classLabels = classLabels.filter(label => label.toLowerCase().startsWith(TARGET_CROP.toLowerCase()));
+    }
     const numClasses = classLabels.length;
-    console.log(`🏷️  Classes: ${numClasses}`);
+    console.log(`🏷️  Target Classes (${numClasses}):`);
+    classLabels.forEach((c, idx) => console.log(`   [${idx + 1}] ${c}`));
 
     // 2. Check dataset folder exists
     if (!fs.existsSync(DATASET_PATH)) {
@@ -78,8 +86,42 @@ async function train() {
 
     // 3. Load MobileNet feature extractor FIRST (needed for streaming)
     console.log(`\n🧠 Loading MobileNet V2 Backbone...`);
-    const mobilenet = await tf.loadGraphModel(MOBILENET_URL, { fromTFHub: true });
-    console.log(`   ✅ MobileNet ready.`);
+    let mobilenet;
+    try {
+        if (fs.existsSync(MOBILENET_LOCAL)) {
+            // Load local MobileNet offline
+            const modelJson = JSON.parse(fs.readFileSync(MOBILENET_LOCAL, "utf8"));
+            const weightManifest = modelJson.weightsManifest;
+            const weightDataList = [];
+            for (const entry of weightManifest) {
+                for (const weightPath of entry.paths) {
+                    weightDataList.push(fs.readFileSync(path.join(MOBILENET_DIR, weightPath)));
+                }
+            }
+            const combinedWeights = Buffer.concat(weightDataList);
+            mobilenet = await tf.loadGraphModel({
+                load: async () => ({
+                    modelTopology: modelJson.modelTopology,
+                    weightSpecs: weightManifest[0].weights,
+                    weightData: combinedWeights.buffer.slice(
+                        combinedWeights.byteOffset,
+                        combinedWeights.byteOffset + combinedWeights.byteLength
+                    ),
+                    format: modelJson.format,
+                    generatedBy: modelJson.generatedBy,
+                    convertedBy: modelJson.convertedBy
+                })
+            });
+            console.log(`   ✅ MobileNet loaded from LOCAL disk (Offline Mode).`);
+        } else {
+            mobilenet = await tf.loadGraphModel(MOBILENET_URL, { fromTFHub: true });
+            console.log(`   ✅ MobileNet downloaded from TFHub.`);
+        }
+    } catch (err) {
+        console.warn(`   ⚠️ Local load failed, falling back to TFHub: ${err.message}`);
+        mobilenet = await tf.loadGraphModel(MOBILENET_URL, { fromTFHub: true });
+    }
+
     const featureSize = 1280;
 
     // 4. Stream dataset: Load images → Extract features → Dispose images (memory-safe)
@@ -93,7 +135,7 @@ async function train() {
     console.log(`   Labels tensor: [${labels.shape}]`);
 
     // 5. Split into train/validation
-    console.log(`\n✂️  Splitting into train/validation...`);
+    console.log(`\n✂️  Splitting into train/validation (80/20)...`);
     const { train: trainData, val: valData } = splitDataset(features, labels, VALIDATION_SPLIT);
     features.dispose();
     labels.dispose();
@@ -105,9 +147,15 @@ async function train() {
     let classifier;
     const modelDir = path.join(__dirname, "crop-disease-model");
     const modelJsonPath = path.join(modelDir, "model.json");
+    const labelsJsonPath = path.join(modelDir, "labels.json");
 
-    if (fs.existsSync(modelJsonPath)) {
-        console.log(`\n♻️  Existing model found! Loading for FINE-TUNING...`);
+    let existingLabels = [];
+    if (fs.existsSync(labelsJsonPath)) {
+        try { existingLabels = JSON.parse(fs.readFileSync(labelsJsonPath, "utf8")); } catch (e) {}
+    }
+
+    if (fs.existsSync(modelJsonPath) && existingLabels.length === numClasses) {
+        console.log(`\n♻️  Compatible model found (${numClasses} classes)! Loading for FINE-TUNING...`);
         try {
             const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, "utf8"));
             classifier = await tf.loadLayersModel({
@@ -121,13 +169,13 @@ async function train() {
                     };
                 }
             });
-            console.log("   ✅ Previous intelligence loaded successfully.");
+            console.log("   ✅ Previous weights loaded successfully.");
         } catch (e) {
             console.log(`   ⚠️  Structure mismatch detected. Building fresh model.`);
             classifier = createNewModel(featureSize, numClasses);
         }
     } else {
-        console.log(`\n🏗️  No existing model. Building fresh architecture...`);
+        console.log(`\n🏗️  Building fresh architecture for ${numClasses} Tomato classes...`);
         classifier = createNewModel(featureSize, numClasses);
     }
 

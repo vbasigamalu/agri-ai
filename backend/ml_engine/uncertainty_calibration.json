@@ -1,0 +1,50 @@
+{
+  "config": {
+    "calibrated": true,
+    "modelType": "MobileNetV3-Large-ONNX",
+    "thresholds": {
+      "diseaseConfidence": 0.48,
+      "predictionMargin": 0.13,
+      "maxEnergyScore": -3.82,
+      "maxEntropy": 1.42,
+      "minQualityScore": 50,
+      "minLeafConfidence": 0.5
+    },
+    "criticalQualityIssues": [
+      "too_blurry",
+      "too_dark",
+      "severely_overexposed",
+      "corrupted_image",
+      "extremely_low_resolution"
+    ],
+    "calibrationStats": {
+      "numInDistributionSamples": 200,
+      "numOodSamples": 185,
+      "idRetentionRate": 84.5,
+      "oodRejectionRate": 57.84,
+      "energyAuroc": 0.8317,
+      "marginAuroc": 0.7772,
+      "top1Auroc": 0.8011
+    }
+  },
+  "id_stats": {
+    "top1_mean": 0.8062048008292914,
+    "top1_std": 0.20261627416145883,
+    "margin_mean": 0.7025317733157135,
+    "margin_std": 0.31362724176186574,
+    "energy_mean": -5.727343761920929,
+    "energy_std": 1.4709116225056942,
+    "entropy_mean": 0.6081313489424065,
+    "entropy_std": 0.5082539992089933
+  },
+  "ood_stats": {
+    "top1_mean": 0.5491892113073452,
+    "top1_std": 0.22438145833545894,
+    "margin_mean": 0.3719228879171046,
+    "margin_std": 0.2982279336070986,
+    "energy_mean": -4.079358964352994,
+    "energy_std": 0.9975383979693471,
+    "entropy_mean": 1.3101175293527745,
+    "entropy_std": 0.5379949893127579
+  }
+}

@@ -19,6 +19,15 @@ backend/dataset.zip
 # Trained ML Model (Included in git as it is lightweight ~680KB)
 
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+venv/
+.venv/
+
 # OS generated files
 .DS_Store
 Thumbs.db

@@ -1,0 +1,505 @@
+{
+  "timestamp": "2026-09-08T08:20:23.933Z",
+  "totalSamples": 180,
+  "samplesPerCategory": 15,
+  "numCategories": 12,
+  "overallSummary": {
+    "baselineReliabilityPercent": 42.22,
+    "robustReliabilityPercent": 55,
+    "netGainPercent": 12.78
+  },
+  "categoryReports": [
+    {
+      "id": 1,
+      "name": "Clean images",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 86.67,
+        "selectiveAccuracy": 86.67,
+        "precisionMacro": 0.9,
+        "recallMacro": 0.9,
+        "f1Macro": 0.8667,
+        "precisionWeighted": 0.9333,
+        "recallWeighted": 0.8667,
+        "f1Weighted": 0.8667,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 9,
+        "rejectedCount": 6,
+        "rejectionRate": 40,
+        "accuracy": 46.67,
+        "selectiveAccuracy": 77.78,
+        "precisionMacro": 0.5167,
+        "recallMacro": 0.5,
+        "f1Macro": 0.48,
+        "precisionWeighted": 0.5556,
+        "recallWeighted": 0.5333,
+        "f1Weighted": 0.5067,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -40,
+        "f1": -0.36,
+        "rejectionRate": 40
+      },
+      "verdict": "🔻 DEGRADED",
+      "latencyMs": 9909
+    },
+    {
+      "id": 2,
+      "name": "Noisy background",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 40,
+        "selectiveAccuracy": 40,
+        "precisionMacro": 0.2583,
+        "recallMacro": 0.45,
+        "f1Macro": 0.3067,
+        "precisionWeighted": 0.2278,
+        "recallWeighted": 0.4,
+        "f1Weighted": 0.2711,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 12,
+        "rejectedCount": 3,
+        "rejectionRate": 20,
+        "accuracy": 53.33,
+        "selectiveAccuracy": 66.67,
+        "precisionMacro": 0.4667,
+        "recallMacro": 0.6,
+        "f1Macro": 0.5133,
+        "precisionWeighted": 0.4889,
+        "recallWeighted": 0.6,
+        "f1Weighted": 0.5289,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": 13.33,
+        "f1": 0.2578,
+        "rejectionRate": 20
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 13555
+    },
+    {
+      "id": 3,
+      "name": "Soil background",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 80,
+        "selectiveAccuracy": 80,
+        "precisionMacro": 0.8667,
+        "recallMacro": 0.85,
+        "f1Macro": 0.8133,
+        "precisionWeighted": 0.8889,
+        "recallWeighted": 0.8,
+        "f1Weighted": 0.7956,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 10,
+        "rejectedCount": 5,
+        "rejectionRate": 33.33,
+        "accuracy": 53.33,
+        "selectiveAccuracy": 80,
+        "precisionMacro": 0.6167,
+        "recallMacro": 0.65,
+        "f1Macro": 0.6133,
+        "precisionWeighted": 0.6222,
+        "recallWeighted": 0.6667,
+        "f1Weighted": 0.6178,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -26.67,
+        "f1": -0.1778,
+        "rejectionRate": 33.33
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 8903
+    },
+    {
+      "id": 4,
+      "name": "Multiple leaves",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 13.33,
+        "selectiveAccuracy": 13.33,
+        "precisionMacro": 0.045,
+        "recallMacro": 0.15,
+        "f1Macro": 0.0667,
+        "precisionWeighted": 0.0467,
+        "recallWeighted": 0.1333,
+        "f1Weighted": 0.0667,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 4,
+        "rejectedCount": 11,
+        "rejectionRate": 73.33,
+        "accuracy": 20,
+        "selectiveAccuracy": 75,
+        "precisionMacro": 0.25,
+        "recallMacro": 0.3,
+        "f1Macro": 0.2667,
+        "precisionWeighted": 0.2333,
+        "recallWeighted": 0.2667,
+        "f1Weighted": 0.2444,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": 6.67,
+        "f1": 0.1777,
+        "rejectionRate": 73.33
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 10255
+    },
+    {
+      "id": 5,
+      "name": "Different lighting",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 60,
+        "selectiveAccuracy": 60,
+        "precisionMacro": 0.65,
+        "recallMacro": 0.6,
+        "f1Macro": 0.5867,
+        "precisionWeighted": 0.7,
+        "recallWeighted": 0.6,
+        "f1Weighted": 0.6044,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 8,
+        "rejectedCount": 7,
+        "rejectionRate": 46.67,
+        "accuracy": 46.67,
+        "selectiveAccuracy": 87.5,
+        "precisionMacro": 0.65,
+        "recallMacro": 0.7,
+        "f1Macro": 0.6667,
+        "precisionWeighted": 0.6667,
+        "recallWeighted": 0.7333,
+        "f1Weighted": 0.6889,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -13.33,
+        "f1": 0.0845,
+        "rejectionRate": 46.67
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 9204
+    },
+    {
+      "id": 6,
+      "name": "Blur",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 46.67,
+        "selectiveAccuracy": 46.67,
+        "precisionMacro": 0.3417,
+        "recallMacro": 0.45,
+        "f1Macro": 0.37,
+        "precisionWeighted": 0.3722,
+        "recallWeighted": 0.4667,
+        "f1Weighted": 0.4,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 0,
+        "rejectedCount": 15,
+        "rejectionRate": 100,
+        "accuracy": 0,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 0,
+        "recallMacro": 0,
+        "f1Macro": 0,
+        "precisionWeighted": 0,
+        "recallWeighted": 0,
+        "f1Weighted": 0,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -46.67,
+        "f1": -0.4,
+        "rejectionRate": 100
+      },
+      "verdict": "🔻 DEGRADED",
+      "latencyMs": 1912
+    },
+    {
+      "id": 7,
+      "name": "Shadows",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 73.33,
+        "selectiveAccuracy": 73.33,
+        "precisionMacro": 0.8,
+        "recallMacro": 0.75,
+        "f1Macro": 0.75,
+        "precisionWeighted": 0.8,
+        "recallWeighted": 0.7333,
+        "f1Weighted": 0.7333,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 11,
+        "rejectedCount": 4,
+        "rejectionRate": 26.67,
+        "accuracy": 53.33,
+        "selectiveAccuracy": 72.73,
+        "precisionMacro": 0.55,
+        "recallMacro": 0.5,
+        "f1Macro": 0.5,
+        "precisionWeighted": 0.6667,
+        "recallWeighted": 0.6,
+        "f1Weighted": 0.6,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -20,
+        "f1": -0.1333,
+        "rejectionRate": 26.67
+      },
+      "verdict": "🔻 DEGRADED",
+      "latencyMs": 7620
+    },
+    {
+      "id": 8,
+      "name": "Low resolution",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 86.67,
+        "selectiveAccuracy": 86.67,
+        "precisionMacro": 0.9,
+        "recallMacro": 0.9,
+        "f1Macro": 0.8667,
+        "precisionWeighted": 0.9333,
+        "recallWeighted": 0.8667,
+        "f1Weighted": 0.8667,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 12,
+        "rejectedCount": 3,
+        "rejectionRate": 20,
+        "accuracy": 73.33,
+        "selectiveAccuracy": 91.67,
+        "precisionMacro": 0.8667,
+        "recallMacro": 0.85,
+        "f1Macro": 0.8467,
+        "precisionWeighted": 0.8889,
+        "recallWeighted": 0.8667,
+        "f1Weighted": 0.8622,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": -13.34,
+        "f1": -0.0045,
+        "rejectionRate": 20
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 9021
+    },
+    {
+      "id": 9,
+      "name": "Partial leaf",
+      "isOod": false,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 20,
+        "selectiveAccuracy": 20,
+        "precisionMacro": 0.1667,
+        "recallMacro": 0.2,
+        "f1Macro": 0.1567,
+        "precisionWeighted": 0.2,
+        "recallWeighted": 0.2,
+        "f1Weighted": 0.1756,
+        "isOod": false
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 8,
+        "rejectedCount": 7,
+        "rejectionRate": 46.67,
+        "accuracy": 46.67,
+        "selectiveAccuracy": 87.5,
+        "precisionMacro": 0.4667,
+        "recallMacro": 0.45,
+        "f1Macro": 0.4467,
+        "precisionWeighted": 0.5556,
+        "recallWeighted": 0.5333,
+        "f1Weighted": 0.5289,
+        "isOod": false
+      },
+      "delta": {
+        "accuracy": 26.67,
+        "f1": 0.3533,
+        "rejectionRate": 46.67
+      },
+      "verdict": "🚀 IMPROVED",
+      "latencyMs": 7992
+    },
+    {
+      "id": 10,
+      "name": "Unrelated/non-leaf images",
+      "isOod": true,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 0,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 0,
+        "recallMacro": 0,
+        "f1Macro": 0,
+        "f1Weighted": 0,
+        "isOod": true
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 3,
+        "rejectedCount": 12,
+        "rejectionRate": 80,
+        "accuracy": 80,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 1,
+        "recallMacro": 0.8,
+        "f1Macro": 0.8889,
+        "f1Weighted": 0.8889,
+        "isOod": true
+      },
+      "delta": {
+        "accuracy": 80,
+        "f1": 0.8889,
+        "rejectionRate": 80
+      },
+      "verdict": "🚀 HIGHLY IMPROVED",
+      "latencyMs": 7160
+    },
+    {
+      "id": 11,
+      "name": "Unsupported crop",
+      "isOod": true,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 0,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 0,
+        "recallMacro": 0,
+        "f1Macro": 0,
+        "f1Weighted": 0,
+        "isOod": true
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 0,
+        "rejectedCount": 15,
+        "rejectionRate": 100,
+        "accuracy": 100,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 1,
+        "recallMacro": 1,
+        "f1Macro": 1,
+        "f1Weighted": 1,
+        "isOod": true
+      },
+      "delta": {
+        "accuracy": 100,
+        "f1": 1,
+        "rejectionRate": 100
+      },
+      "verdict": "🚀 HIGHLY IMPROVED",
+      "latencyMs": 8415
+    },
+    {
+      "id": 12,
+      "name": "Unknown/uncertain disease",
+      "isOod": true,
+      "baseline": {
+        "total": 15,
+        "acceptedCount": 15,
+        "rejectedCount": 0,
+        "rejectionRate": 0,
+        "accuracy": 0,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 0,
+        "recallMacro": 0,
+        "f1Macro": 0,
+        "f1Weighted": 0,
+        "isOod": true
+      },
+      "robust": {
+        "total": 15,
+        "acceptedCount": 2,
+        "rejectedCount": 13,
+        "rejectionRate": 86.67,
+        "accuracy": 86.67,
+        "selectiveAccuracy": 0,
+        "precisionMacro": 1,
+        "recallMacro": 0.8667,
+        "f1Macro": 0.9286,
+        "f1Weighted": 0.9286,
+        "isOod": true
+      },
+      "delta": {
+        "accuracy": 86.67,
+        "f1": 0.9286,
+        "rejectionRate": 86.67
+      },
+      "verdict": "🚀 HIGHLY IMPROVED",
+      "latencyMs": 6369
+    }
+  ]
+}

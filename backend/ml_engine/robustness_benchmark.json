@@ -1,0 +1,87 @@
+{
+  "model_architecture": "mobilenetv3_large_100",
+  "image_size": 224,
+  "num_classes": 10,
+  "class_names": [
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___Spider_mites Two-spotted_spider_mite",
+    "Tomato___Target_Spot",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+    "Tomato___Tomato_mosaic_virus",
+    "Tomato___healthy"
+  ],
+  "total_samples": 1000,
+  "split_counts": {
+    "train": 700,
+    "val": 150,
+    "test_normal": 150,
+    "test_noisy": 150
+  },
+  "background_randomization": {
+    "enabled": true,
+    "probability": 0.5,
+    "background_types": [
+      "soil",
+      "grass",
+      "farm_field",
+      "vegetation",
+      "neutral"
+    ]
+  },
+  "normal_test_metrics": {
+    "accuracy": 83.33,
+    "precision_weighted": 0.8399,
+    "precision_macro": 0.8399,
+    "recall_weighted": 0.8333,
+    "recall_macro": 0.8333,
+    "f1_weighted": 0.8296,
+    "f1_macro": 0.8296,
+    "confusion_matrix_file": "confusion_matrix_normal.png"
+  },
+  "noisy_background_metrics": {
+    "accuracy": 79.33,
+    "precision_weighted": 0.8056,
+    "precision_macro": 0.8056,
+    "recall_weighted": 0.7933,
+    "recall_macro": 0.7933,
+    "f1_weighted": 0.7924,
+    "f1_macro": 0.7924,
+    "confusion_matrix_file": "confusion_matrix_noisy.png"
+  },
+  "robustness_summary": {
+    "normal_accuracy": 83.33,
+    "noisy_accuracy": 79.33,
+    "accuracy_drop_pct": 4.0,
+    "retention_percentage": 95.2
+  },
+  "training_history": {
+    "train_loss": [
+      2.6732163892473495,
+      1.3986761801583427,
+      1.1295545516695296,
+      0.9571287849971226
+    ],
+    "val_loss": [
+      1.9201,
+      1.1784,
+      1.0735,
+      0.9453
+    ],
+    "val_acc": [
+      0.62,
+      0.7733,
+      0.7933,
+      0.8667
+    ],
+    "val_f1": [
+      0.6103,
+      0.7679,
+      0.7844,
+      0.8683
+    ]
+  }
+}

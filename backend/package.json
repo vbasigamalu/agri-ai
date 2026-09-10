@@ -23,11 +23,15 @@
     "@tensorflow/tfjs-node": "^4.22.0",
     "archiver": "^7.0.1",
     "axios": "^1.13.6",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.4.1",
     "multer": "^2.1.1",
+    "onnxruntime-node": "^1.29.0",
+    "pg": "^8.23.0",
     "sharp": "^0.33.5"
   }
 }

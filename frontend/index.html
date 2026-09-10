@@ -35,27 +35,89 @@
 <body>
 
 <div class="container">
-    <!-- Global Language Selector -->
+    <!-- Global Header with Language & User Badge -->
     <div class="global-header">
-        <div id="google_translate_element"></div>
-        <button id="logoutBtn" class="logout-fixed-btn hidden" title="Logout">🚪</button>
+        <div class="user-profile-badge hidden" id="userProfileBadge">
+            <span class="user-avatar">👨‍🌾</span>
+            <div class="user-meta">
+                <strong id="loggedUserName">Farmer</strong>
+                <span class="user-location-badge" id="loggedUserLocation">Maharashtra</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div id="google_translate_element"></div>
+            <button id="logoutBtn" class="logout-fixed-btn hidden" title="Logout (लॉगआउट)">🚪</button>
+        </div>
     </div>
     
-    <!-- Login Section -->
+    <!-- Authentication Section (PostgreSQL + JWT + bcrypt) -->
     <div id="loginSection">
-        <h2>👨‍🌾 Farmer Login</h2>
-        <div class="login-form">
-            <div class="input-group">
-                <label for="username">Farmer ID / Phone</label>
-                <input type="text" id="username" placeholder="Enter your ID">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <span class="brand-icon">🌱</span>
+                <h2>Agri-AI Portal</h2>
+                <p class="brand-subtitle">Smart Crop Health & Advisory Platform</p>
             </div>
-            <div class="input-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" placeholder="••••••••">
-            </div>
-            <button type="button" id="loginBtn">Access Advisor</button>
 
-            <p id="loginError" class="error-msg"></p>
+            <!-- Auth Tabs (Login / Register) -->
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab-btn active" id="tabLoginBtn">🔑 Login (लॉगिन)</button>
+                <button type="button" class="auth-tab-btn" id="tabRegisterBtn">📝 Register (नोंदणी)</button>
+            </div>
+
+            <!-- 1. LOGIN FORM -->
+            <form id="loginForm" class="login-form">
+                <div class="input-group">
+                    <label for="loginIdentifier">Phone Number or Email (मोबाईल / ईमेल)</label>
+                    <input type="text" id="loginIdentifier" placeholder="e.g. 9876543210 or farmer@agri.ai" required autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="loginPassword">Password (पासवर्ड)</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <button type="submit" id="submitLoginBtn" class="primary-btn">
+                    <span>Access Smart Advisor (प्रवेश करा)</span> 🚀
+                </button>
+            </form>
+
+            <!-- 2. REGISTER FORM -->
+            <form id="registerForm" class="login-form hidden">
+                <div class="input-group">
+                    <label for="regName">Full Name (पूर्ण नाव)</label>
+                    <input type="text" id="regName" placeholder="e.g. Ramesh Patil" required>
+                </div>
+                <div class="input-group">
+                    <label for="regIdentifier">Phone Number or Email (मोबाईल / ईमेल)</label>
+                    <input type="text" id="regIdentifier" placeholder="e.g. 9876543210" required>
+                </div>
+                <div class="input-group">
+                    <label for="regPassword">Password (पासवर्ड - किमान ६ अक्षरे)</label>
+                    <input type="password" id="regPassword" placeholder="••••••••" minlength="6" required>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="regDistrict">District (जिल्हा)</label>
+                        <input type="text" id="regDistrict" placeholder="e.g. Nashik, Pune">
+                    </div>
+                    <div class="input-group">
+                        <label for="regVillage">Village (गाव)</label>
+                        <input type="text" id="regVillage" placeholder="e.g. Pimpalgaon">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="regRole">Role (भूमिका)</label>
+                    <select id="regRole" class="auth-select">
+                        <option value="farmer">🌾 Farmer (शेतकरी)</option>
+                        <option value="officer">🏛️ Agriculture Officer (कृषी अधिकारी)</option>
+                        <option value="expert">🔬 Agronomist / Expert (तज्ज्ञ)</option>
+                    </select>
+                </div>
+                <button type="submit" id="submitRegisterBtn" class="primary-btn">
+                    <span>Create Farmer Account (खाते तयार करा)</span> ✨
+                </button>
+            </form>
+
+            <p id="authMessage" class="auth-status-msg"></p>
         </div>
     </div>
 

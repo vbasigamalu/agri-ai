@@ -15,11 +15,24 @@ const SchemeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const AnalysisSchema = new mongoose.Schema({
+    userId: { type: String },
+    farmerName: { type: String, default: "Anonymous Farmer" },
+    crop: { type: String },
     diseaseName: { type: String, required: true },
     confidence: { type: Number, required: true },
+    severity: { type: String, default: "Moderate" },
+    causedBy: { type: String },
     temperature: { type: Number },
     humidity: { type: Number },
+    wind: { type: Number },
+    latitude: { type: Number },
+    longitude: { type: Number },
+    district: { type: String },
+    village: { type: String },
+    spray: { type: String },
     sprayWarnings: [String],
+    advice: [String],
+    prevention: [String],
     alert: { type: String },
     timestamp: { type: Date, default: Date.now },
     imageName: { type: String }

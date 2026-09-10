@@ -17,7 +17,7 @@ const IMAGE_SIZE = 224;
 /**
  * Decode an image file to a TF tensor using sharp
  * @param {string} filePath - Path to image file
- * @returns {tf.Tensor3D} - [224, 224, 3] tensor normalized to [-1, 1]
+ * @returns {tf.Tensor3D} - [224, 224, 3] tensor normalized to [0, 1]
  */
 async function imageToTensor(filePath) {
     // Use sharp to decode, resize, and get raw pixel data
@@ -27,9 +27,9 @@ async function imageToTensor(filePath) {
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-    // Convert raw pixel buffer to float32 tensor and normalize to [-1, 1]
+    // Convert raw pixel buffer to float32 tensor and normalize to [0, 1]
     const tensor = tf.tensor3d(new Uint8Array(data), [IMAGE_SIZE, IMAGE_SIZE, 3]);
-    const normalized = tensor.div(127.5).sub(1);
+    const normalized = tensor.div(255.0);
     tensor.dispose();
     return normalized;
 }
@@ -37,7 +37,7 @@ async function imageToTensor(filePath) {
 /**
  * Decode an image buffer to a TF tensor using sharp
  * @param {Buffer} buffer - Raw image buffer
- * @returns {tf.Tensor3D} - [224, 224, 3] tensor normalized to [-1, 1]
+ * @returns {tf.Tensor3D} - [224, 224, 3] tensor normalized to [0, 1]
  */
 async function bufferToTensor(buffer) {
     const { data } = await sharp(buffer)
@@ -47,7 +47,7 @@ async function bufferToTensor(buffer) {
         .toBuffer({ resolveWithObject: true });
 
     const tensor = tf.tensor3d(new Uint8Array(data), [IMAGE_SIZE, IMAGE_SIZE, 3]);
-    const normalized = tensor.div(127.5).sub(1);
+    const normalized = tensor.div(255.0);
     tensor.dispose();
     return normalized;
 }
@@ -190,10 +190,10 @@ async function loadAndExtractFeatures(datasetPath, classLabels, mobilenet, maxPe
         files = shuffleArray(files).slice(0, maxPerClass);
 
         // Process in small micro-batches to balance speed and memory
-        const MICRO_BATCH_SIZE = 20; 
+        const MICRO_BATCH_SIZE = 20;
         for (let i = 0; i < files.length; i += MICRO_BATCH_SIZE) {
             const batchFiles = files.slice(i, i + MICRO_BATCH_SIZE);
-            
+
             const batchTensors = await Promise.all(
                 batchFiles.map(file => imageToTensor(path.join(classDir, file)))
             );
@@ -224,7 +224,7 @@ async function loadAndExtractFeatures(datasetPath, classLabels, mobilenet, maxPe
     }
 
     console.log(`\n\n📊 Final Collection: ${totalLoaded} feature vectors ready.`);
-    
+
     const featuresTensor = tf.tensor2d(allFeatures);
     const labelsTensor = tf.tensor2d(allLabels);
 

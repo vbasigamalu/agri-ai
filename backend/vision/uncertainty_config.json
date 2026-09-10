@@ -1,0 +1,28 @@
+{
+  "calibrated": true,
+  "modelType": "MobileNetV3-Large-ONNX",
+  "thresholds": {
+    "diseaseConfidence": 0.48,
+    "predictionMargin": 0.13,
+    "maxEnergyScore": -3.2,
+    "maxEntropy": 1.42,
+    "minQualityScore": 50,
+    "minLeafConfidence": 0.5
+  },
+  "criticalQualityIssues": [
+    "too_blurry",
+    "too_dark",
+    "severely_overexposed",
+    "corrupted_image",
+    "extremely_low_resolution"
+  ],
+  "calibrationStats": {
+    "numInDistributionSamples": 200,
+    "numOodSamples": 185,
+    "idRetentionRate": 84.5,
+    "oodRejectionRate": 57.84,
+    "energyAuroc": 0.8317,
+    "marginAuroc": 0.7772,
+    "top1Auroc": 0.8011
+  }
+}

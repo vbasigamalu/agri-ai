@@ -187,6 +187,10 @@ const {
     aggregateMultiLeafPredictions
 } = require("./multiLeafAggregator");
 
+const {
+    estimateDiseaseSeverity
+} = require("./severityEstimator");
+
 module.exports = {
     runVisionPipeline,
     checkImageQuality,
@@ -200,6 +204,7 @@ module.exports = {
     getUncertaintyConfig,
     filterCandidateLeaves,
     cropAndPreprocessLeaf,
-    aggregateMultiLeafPredictions
+    aggregateMultiLeafPredictions,
+    estimateDiseaseSeverity
 };
 

@@ -279,9 +279,10 @@ analyzeBtn.addEventListener("click", async () => {
                 causedByEl.innerText = "Caused by: " + data.causedBy;
             }
 
-            // Decision highlighting
+            // Decision highlighting & Color-coding
+            const sevLower = (data.severity || "").toLowerCase();
             const sprayEl = document.getElementById("sprayDecision");
-            if (data.severity === "Critical") {
+            if (sevLower.includes("critical") || sevLower.includes("severe")) {
                 sprayEl.parentElement.classList.add("danger-bg");
                 sprayEl.style.color = "#ff4d4d";
             } else {
@@ -289,10 +290,19 @@ analyzeBtn.addEventListener("click", async () => {
                 sprayEl.style.color = "var(--primary)";
             }
 
-            // Color-code severity
+            // Color-code severity display
             const severityEl = document.getElementById("severity");
-            const sevLower = data.severity.toLowerCase();
-            severityEl.style.color = (sevLower === 'critical') ? '#ff4d4d' : (sevLower === 'major') ? '#ffae42' : '#10b981';
+            if (sevLower.includes("critical")) {
+                severityEl.style.color = "#ff4d4d";
+            } else if (sevLower.includes("severe")) {
+                severityEl.style.color = "#ff7043";
+            } else if (sevLower.includes("moderate") || sevLower.includes("major")) {
+                severityEl.style.color = "#ffae42";
+            } else if (sevLower.includes("mild")) {
+                severityEl.style.color = "#eab308";
+            } else {
+                severityEl.style.color = "#10b981";
+            }
 
             // Render symptoms
             const symptomsList = document.getElementById("symptomsList");

@@ -26,7 +26,8 @@ const {
     evaluateUncertainty,
     filterCandidateLeaves,
     cropAndPreprocessLeaf,
-    aggregateMultiLeafPredictions
+    aggregateMultiLeafPredictions,
+    estimateDiseaseSeverity
 } = require("./vision");
 
 const MODEL_DIR = path.join(__dirname, "crop-disease-model");
@@ -554,6 +555,17 @@ async function classifyOnnx(imageBuffer) {
             const finalSprayTiming = info && info.spray ? info.spray.timing : "N/A";
             const finalSprayQty = info && info.spray ? info.spray.quantity : "N/A";
 
+            // ── Vision-Based Multi-Leaf Severity Estimation ───────────
+            const isMultiHealthy = multiLeafAgg.status === "healthy";
+            const multiSeverityEval = await estimateDiseaseSeverity(vision.processedBuffer || imageBuffer, {
+                label: dominantLabel,
+                diseaseName: multiLeafAgg.disease,
+                isHealthy: isMultiHealthy
+            });
+            const multiSeverityString = isMultiHealthy
+                ? "Healthy (0% Area Damaged)"
+                : multiSeverityEval.visualSummary;
+
             return {
                 status: multiLeafAgg.status,
                 infectionStatus: multiLeafAgg.status,
@@ -591,7 +603,9 @@ async function classifyOnnx(imageBuffer) {
                 leafDetection: vision.leafDetection,
                 preprocessing: vision.suppression,
                 causedBy: info ? info.causedBy : "Crop Pathogen",
-                severity: multiLeafAgg.status === "healthy" ? "None" : (info ? info.severity : "Moderate"),
+                severity: multiSeverityString,
+                severityMetrics: multiSeverityEval,
+                affectedAreaPercent: multiSeverityEval.affectedAreaPercent,
                 symptoms: finalSymptoms,
                 advice: finalAdvice,
                 prevention: finalPrevention,
@@ -700,7 +714,20 @@ async function classifyOnnx(imageBuffer) {
         }
     }
 
+    // ── Vision-Based Disease Severity Estimation ──────────────────
+    const isHealthyDiagnosis = labelKey.toLowerCase().includes("healthy") || diseaseName.toLowerCase().includes("healthy");
+    const severityEval = await estimateDiseaseSeverity(vision.processedBuffer || imageBuffer, {
+        label: labelKey,
+        diseaseName,
+        isHealthy: isHealthyDiagnosis
+    });
+
+    const finalSeverityString = status === "retake_required"
+        ? "N/A"
+        : (isConfirmed ? severityEval.visualSummary : `${severityEval.visualSummary} (Uncertain)`);
+
     console.log(`  • Model Engine:         PyTorch ONNX (crop_disease_model.onnx)`);
+    console.log(`  • Vision Severity:      ${severityEval.visualSummary} [${severityEval.stage}]`);
     console.log(`  • Uncertainty Gate:     [${status.toUpperCase()}] ${reason ? `(Reason: ${reason})` : "(All Safety Checks Passed)"}`);
     console.log(`  • Free Energy Score:    ${gateResult.metrics.energyScore} (Max Safe Threshold: ${gateResult.thresholds.maxEnergyScore})`);
     console.log(`  • Prediction Margin:    ${(gateResult.metrics.predictionMargin * 100).toFixed(1)}% (Min Threshold: ${(gateResult.thresholds.predictionMargin * 100).toFixed(1)}%)`);
@@ -772,7 +799,9 @@ async function classifyOnnx(imageBuffer) {
         },
         label: isConfirmed ? labelKey : "uncertain",
         causedBy: isConfirmed && info ? info.causedBy : (reason ? `Uncertainty Gate (${reason})` : "Unknown"),
-        severity: isConfirmed && info ? info.severity : (isConfirmed ? "Moderate" : "Uncertain"),
+        severity: finalSeverityString,
+        severityMetrics: severityEval,
+        affectedAreaPercent: severityEval.affectedAreaPercent,
         symptoms: finalSymptoms,
         advice: finalAdvice,
         prevention: finalPrevention,

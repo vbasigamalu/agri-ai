@@ -49,8 +49,30 @@ const ChatSessionSchema = new mongoose.Schema({
     lastUpdated: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+const PestLogSchema = new mongoose.Schema({
+    userId: { type: String },
+    farmerName: { type: String, default: "Anonymous Farmer" },
+    crop: { type: String, default: "General" },
+    pestName: { type: String, required: true },
+    pestId: { type: String, required: true },
+    scientificName: { type: String },
+    confidence: { type: Number, default: 0.95 },
+    trapCount: { type: Number, default: 0 },
+    economicThreshold: { type: Number, default: 10 },
+    severity: { type: String, default: "Low" },
+    isEtlExceeded: { type: Boolean, default: false },
+    earlierDaysCounts: [{ daysAgo: Number, count: Number }],
+    forecast: { type: mongoose.Schema.Types.Mixed },
+    chemicalControl: [String],
+    biologicalControl: [String],
+    preventiveMeasures: [String],
+    imagePath: { type: String },
+    timestamp: { type: Date, default: Date.now }
+});
+
 const Scheme = mongoose.model("Scheme", SchemeSchema);
 const Analysis = mongoose.model("Analysis", AnalysisSchema);
 const ChatSession = mongoose.model("ChatSession", ChatSessionSchema);
+const PestLog = mongoose.model("PestLog", PestLogSchema);
 
-module.exports = { Scheme, Analysis, ChatSession };
+module.exports = { Scheme, Analysis, ChatSession, PestLog };

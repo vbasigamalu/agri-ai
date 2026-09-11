@@ -12,6 +12,7 @@ const { getDiseaseInfo, searchByKeyword, getSpraySafetyCheck } = require("./crop
 const { initPostgres } = require("./postgres");
 const { optionalAuth, authenticateToken } = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
+const pestRoutes = require("./routes/pestRoutes");
 
 dotenv.config();
 
@@ -25,9 +26,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend")));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Mount Authentication Routes
+// Mount Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/pest", pestRoutes);
 
 const upload = multer({ storage: multer.memoryStorage() });
 

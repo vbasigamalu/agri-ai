@@ -78,6 +78,10 @@
                 <button type="submit" id="submitLoginBtn" class="primary-btn">
                     <span>Access Smart Advisor (प्रवेश करा)</span> 🚀
                 </button>
+                <div style="text-align: center; margin: 0.8rem 0 0.4rem 0; color: var(--text-muted); font-size: 0.8rem;">— OR —</div>
+                <button type="button" id="guestLoginBtn" class="secondary-btn" style="width: 100%;">
+                    <span>🌾 Continue as Guest Farmer (अतिथी म्हणून सुरू ठेवा)</span>
+                </button>
             </form>
 
             <!-- 2. REGISTER FORM -->
@@ -128,8 +132,9 @@
         </div>
 
         <div class="tabs-container">
-            <button class="tab-btn active" data-target="advisorTab">Smart Advisor</button>
-            <button class="tab-btn" data-target="historyTab" id="loadHistoryBtn">My History</button>
+            <button class="tab-btn active" data-target="advisorTab">🌿 Crop Disease Advisor</button>
+            <button class="tab-btn" data-target="pestTab" id="pestTabBtn">🦗 Pest & Trap Monitor</button>
+            <button class="tab-btn" data-target="historyTab" id="loadHistoryBtn">📜 Scan History</button>
         </div>
 
         <div id="advisorTab" class="tab-content active">
@@ -248,6 +253,569 @@
                     </div>
                 </div>
             </div>
+            </div>
+        </div>
+
+
+        <!-- ══════════════════════════════════════════════════════════════
+             PEST MONITORING & TRAP ANALYSIS TAB (UPGRADED)
+        ══════════════════════════════════════════════════════════════ -->
+        <div id="pestTab" class="tab-content hidden">
+            <!-- Hero Header Banner -->
+            <div class="pest-hero-banner">
+                <div class="pest-hero-text">
+                    <div class="pest-hero-badge">🦗 ICAR & CIB&RC Smart Surveillance System</div>
+                    <h2>🌾 Pest & Trap Monitor & Outbreak Forecaster</h2>
+                    <p>Detect pest species with AI vision, track historical population growth velocity, and forecast infestation risk 3 to 7 days ahead.</p>
+                </div>
+                <div class="pest-hero-stats">
+                    <div class="hero-stat-box">
+                        <span class="stat-number">9</span>
+                        <span class="stat-label">Species AI</span>
+                    </div>
+                    <div class="hero-stat-box">
+                        <span class="stat-number">+7d</span>
+                        <span class="stat-label">Risk Forecast</span>
+                    </div>
+                    <div class="hero-stat-box">
+                        <span class="stat-number">ETL</span>
+                        <span class="stat-label">Safety Limits</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pest-grid">
+                <!-- Left: Upload, Live Camera & Trap Count Panel -->
+                <div class="pest-input-panel">
+                    <div class="pest-card">
+                        <div class="pest-card-header">
+                            <div class="card-title-wrap">
+                                <span class="card-icon-badge">📸</span>
+                                <div>
+                                    <h3>Pest or Trap Photo</h3>
+                                    <small>Upload or snap photo of insect / sticky trap</small>
+                                </div>
+                            </div>
+                            <span class="badge-ai">AI Vision 2.0</span>
+                        </div>
+
+                        <!-- Upload Zone & Camera Trigger -->
+                        <div class="pest-upload-box" id="pestDropZone">
+                            <label for="pestImageInput" class="pest-upload-label" id="pestUploadLabel">
+                                <span class="upload-icon">🦗</span>
+                                <strong id="pestFileLabel">Click or drag Pest Photo to upload</strong>
+                                <small>Supports JPG, PNG, WEBP from phone or desktop</small>
+                            </label>
+                            <input type="file" id="pestImageInput" accept="image/*" capture="environment" hidden>
+                            <div id="pestPreviewContainer" class="hidden">
+                                <img id="pestPreviewImg" src="" alt="Pest Preview">
+                                <div class="preview-actions">
+                                    <button type="button" id="pestRetakeBtn" class="mini-btn">🔄 Change Photo</button>
+                                    <button type="button" id="pestRemoveImgBtn" class="mini-danger-btn">❌ Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Camera Button -->
+                        <div class="camera-actions-pest">
+                            <button type="button" id="openPestCameraBtn" class="secondary-btn pest-cam-btn">
+                                <span>🤳 Open Live Camera (लाइव्ह कॅमेरा)</span>
+                            </button>
+                        </div>
+
+                        <!-- Target Crop Selection -->
+                        <div class="form-row-pest">
+                            <div class="input-group">
+                                <label for="pestCropSelect">
+                                    <span>🌱 Target Crop (पीक निवडा)</span>
+                                    <small>Configures species-specific ETL limits</small>
+                                </label>
+                                <select id="pestCropSelect" class="pest-select-styled">
+                                    <option value="Cotton">Cotton (कापूस) — Bollworm & Mites</option>
+                                    <option value="Maize">Maize / Corn (मका) — Fall Armyworm</option>
+                                    <option value="Paddy (Rice)">Paddy / Rice (भात) — Stem Borer</option>
+                                    <option value="Chilli">Chilli / Pepper (मिरची) — Mites & Aphids</option>
+                                    <option value="Tomato">Tomato (टोमॅटो) — Flea Beetle & Aphids</option>
+                                    <option value="Mustard">Mustard (मोहरी) — Sawfly & Aphids</option>
+                                    <option value="Brinjal">Brinjal / Eggplant (वांगी) — Stem Borer</option>
+                                    <option value="General Crop">General / Other Crop</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Earlier Days Monitoring Data (Multi-Day Trajectory Logger) -->
+                        <div class="earlier-days-container">
+                            <div class="earlier-header">
+                                <div class="earlier-title-group">
+                                    <span class="icon-pulse">📈</span>
+                                    <div>
+                                        <strong>Multi-Day Pest Trajectory Tracker</strong>
+                                        <p>Earlier days data enables AI to calculate growth velocity ($\Delta N / \Delta t$) & forecast risk</p>
+                                    </div>
+                                </div>
+                                <span class="badge-forecast">Growth Forecaster</span>
+                            </div>
+
+                            <div class="history-inputs-grid">
+                                <!-- 7 Days Ago -->
+                                <div class="history-input-card">
+                                    <div class="card-label-row">
+                                        <label for="past7DaysCount">🗓️ 7 Days Ago</label>
+                                        <small>७ दिवसांपूर्वी</small>
+                                    </div>
+                                    <div class="stepper-wrap">
+                                        <button type="button" class="stepper-btn" data-step="past7DaysCount" data-dir="-1">−</button>
+                                        <input type="number" id="past7DaysCount" min="0" max="500" placeholder="0">
+                                        <button type="button" class="stepper-btn" data-step="past7DaysCount" data-dir="1">+</button>
+                                    </div>
+                                    <input type="range" class="trap-range-slider" id="slider7d" min="0" max="60" value="0">
+                                    <div class="slider-ticks"><span>0</span><span>30</span><span>60+</span></div>
+                                </div>
+
+                                <!-- 3 Days Ago -->
+                                <div class="history-input-card">
+                                    <div class="card-label-row">
+                                        <label for="past3DaysCount">🗓️ 3 Days Ago</label>
+                                        <small>३ दिवसांपूर्वी</small>
+                                    </div>
+                                    <div class="stepper-wrap">
+                                        <button type="button" class="stepper-btn" data-step="past3DaysCount" data-dir="-1">−</button>
+                                        <input type="number" id="past3DaysCount" min="0" max="500" placeholder="0">
+                                        <button type="button" class="stepper-btn" data-step="past3DaysCount" data-dir="1">+</button>
+                                    </div>
+                                    <input type="range" class="trap-range-slider" id="slider3d" min="0" max="60" value="0">
+                                    <div class="slider-ticks"><span>0</span><span>30</span><span>60+</span></div>
+                                </div>
+
+                                <!-- Today's Live Trap Count -->
+                                <div class="history-input-card highlight-today">
+                                    <div class="card-label-row">
+                                        <label for="manualTrapCount">📍 Today's Count</label>
+                                        <small>आजची मोजणी</small>
+                                    </div>
+                                    <div class="stepper-wrap">
+                                        <button type="button" class="stepper-btn" data-step="manualTrapCount" data-dir="-1">−</button>
+                                        <input type="number" id="manualTrapCount" min="0" max="500" value="0" placeholder="0">
+                                        <button type="button" class="stepper-btn" data-step="manualTrapCount" data-dir="1">+</button>
+                                    </div>
+                                    <input type="range" class="trap-range-slider accent-slider" id="sliderToday" min="0" max="60" value="0">
+                                    <div class="slider-ticks"><span>0</span><span>30</span><span>60+</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Live Velocity Preview Banner -->
+                            <div class="live-velocity-preview" id="liveVelocityPreview">
+                                <span class="preview-dot"></span>
+                                <span id="previewVelocityText">Enter counts above to compute instant population velocity</span>
+                            </div>
+
+                            <!-- Quick Preset Fill for Farmer Convenience -->
+                            <div class="scenario-pills">
+                                <span class="scenario-label">Quick Simulation Presets:</span>
+                                <button type="button" class="scenario-btn surge" data-scenario="surge" title="Simulate outbreak surge">🚨 Surging Outbreak (+220%)</button>
+                                <button type="button" class="scenario-btn moderate" data-scenario="moderate" title="Simulate gradual increase">⚠️ Steady Buildup</button>
+                                <button type="button" class="scenario-btn declining" data-scenario="declining" title="Simulate effective biocontrol">🟢 Suppressed / Falling</button>
+                                <button type="button" class="scenario-btn clear" data-scenario="clear" title="Reset counts">🧹 Clear</button>
+                            </div>
+                        </div>
+
+                        <button type="button" id="detectPestBtn" class="primary-btn pest-analyze-btn glow-effect">
+                            <span>🔍 Detect Pest Species & Forecast Outbreak Risk</span> 🚀
+                        </button>
+                        <p id="pestStatusMsg" class="pest-status-text"></p>
+                    </div>
+
+                    <!-- Quick Pest Encyclopedia / Reference Guide -->
+                    <div class="pest-guide-card">
+                        <div class="guide-header-row">
+                            <h4>📚 Supported Agricultural Pests (9 Species)</h4>
+                            <span class="guide-count">9 Models Ready</span>
+                        </div>
+                        <p class="guide-desc">Click any pest to preview scientific profile, symptoms, and pre-fill sample trap counts:</p>
+                        
+                        <!-- Search / Filter for Pests -->
+                        <div class="pest-search-box">
+                            <input type="text" id="pestSearchInput" placeholder="🔍 Filter by name or crop (e.g. armyworm, cotton, borer)...">
+                        </div>
+
+                        <div class="pest-tags-grid" id="pestTagsGrid">
+                            <div class="pest-tag-card" data-pest="aphids">
+                                <span class="tag-icon">🌿</span>
+                                <div class="tag-body">
+                                    <strong>Aphids (मावा / चेपा)</strong>
+                                    <small>Sucking • Cotton, Mustard, Vegetables</small>
+                                </div>
+                                <span class="tag-etl">ETL: 20/leaf</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="armyworm">
+                                <span class="tag-icon">🐛</span>
+                                <div class="tag-body">
+                                    <strong>Fall Armyworm (सैनिक कीड़ा)</strong>
+                                    <small>Defoliator • Maize, Sorghum, Millet</small>
+                                </div>
+                                <span class="tag-etl">ETL: 8 moths</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="beetle">
+                                <span class="tag-icon">🪲</span>
+                                <div class="tag-body">
+                                    <strong>Flea Beetle (भृंग / पिस्सू भृंग)</strong>
+                                    <small>Chewing • Tomato, Brinjal, Cabbage</small>
+                                </div>
+                                <span class="tag-etl">ETL: 5/plant</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="bollworm">
+                                <span class="tag-icon">🌸</span>
+                                <div class="tag-body">
+                                    <strong>Pink Bollworm (गुलाबी सुंडी)</strong>
+                                    <small>Internal borer • Cotton, Okra</small>
+                                </div>
+                                <span class="tag-etl">ETL: 8 moths</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="grasshopper">
+                                <span class="tag-icon">🦗</span>
+                                <div class="tag-body">
+                                    <strong>Grasshopper (टोळ / फदका)</strong>
+                                    <small>Chewing • Paddy, Wheat, Grasses</small>
+                                </div>
+                                <span class="tag-etl">ETL: 3/m²</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="mites">
+                                <span class="tag-icon">🕷️</span>
+                                <div class="tag-body">
+                                    <strong>Red Spider Mites (लाल कोळी)</strong>
+                                    <small>Sucking • Chilli, Cotton, Tomato</small>
+                                </div>
+                                <span class="tag-etl">ETL: 10/cm²</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="mosquito">
+                                <span class="tag-icon">🦟</span>
+                                <div class="tag-body">
+                                    <strong>Tea Mosquito Bug (डास बग)</strong>
+                                    <small>Flush die-back • Cashew, Guava, Tea</small>
+                                </div>
+                                <span class="tag-etl">ETL: 5/tree</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="sawfly">
+                                <span class="tag-icon">🪰</span>
+                                <div class="tag-body">
+                                    <strong>Mustard Sawfly (करवत माशी)</strong>
+                                    <small>Seedling defoliator • Mustard, Radish</small>
+                                </div>
+                                <span class="tag-etl">ETL: 2/m row</span>
+                            </div>
+
+                            <div class="pest-tag-card" data-pest="stem_borer">
+                                <span class="tag-icon">🌾</span>
+                                <div class="tag-body">
+                                    <strong>Paddy Stem Borer (खोडरोग अळी)</strong>
+                                    <small>Dead heart/White ear • Rice, Maize</small>
+                                </div>
+                                <span class="tag-etl">ETL: 5 moths</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Analysis Results, SVG Trajectory Chart & Advisory -->
+                <div class="pest-results-panel">
+                    <!-- Diagnostic Card -->
+                    <div class="pest-result-card" id="pestResultCard">
+                        <div class="pest-res-header">
+                            <div>
+                                <span class="res-subtitle">AI Identified Insect Species</span>
+                                <h2 id="resPestName">Awaiting Pest Image...</h2>
+                                <p id="resPestScientific" class="scientific-name">Upload or snap a photo to view species diagnosis</p>
+                            </div>
+                            <div class="pest-confidence-badge" id="resPestConfidence">--% Match</div>
+                        </div>
+
+                        <!-- 3-Zone Economic Threshold Meter -->
+                        <div class="etl-meter-container" id="etlMeterContainer">
+                            <div class="etl-header">
+                                <div class="etl-title-row">
+                                    <span class="etl-icon">⚖️</span>
+                                    <div>
+                                        <strong>Economic Threshold Level (ETL) Safety Gauge</strong>
+                                        <small>Point at which pest damage exceeds cost of treatment</small>
+                                    </div>
+                                </div>
+                                <strong id="resSeverityBadge" class="severity-pill">Normal</strong>
+                            </div>
+
+                            <!-- 3-Zone Gauge Bar -->
+                            <div class="etl-gauge-track">
+                                <div class="gauge-zone zone-safe" title="Safe Zone (0 - 50% ETL)"><span>Safe</span></div>
+                                <div class="gauge-zone zone-warn" title="Warning Zone (50% - 100% ETL)"><span>Warning</span></div>
+                                <div class="gauge-zone zone-hazard" title="Action Hazard (> 100% ETL)"><span>Action Hazard</span></div>
+                                <div id="etlBarFill" class="etl-gauge-needle" style="left: 15%;"></div>
+                            </div>
+
+                            <div class="etl-stats-row">
+                                <div class="etl-stat-box">
+                                    <span class="stat-label">Farmer Trap Count</span>
+                                    <strong id="resTrapCount" class="stat-val">0</strong>
+                                </div>
+                                <div class="etl-stat-box">
+                                    <span class="stat-label">Ratio vs Threshold</span>
+                                    <strong id="resEtlRatio" class="stat-val">0.0x</strong>
+                                </div>
+                                <div class="etl-stat-box">
+                                    <span class="stat-label">Scientific ETL Limit</span>
+                                    <strong id="resThresholdLimit" class="stat-val">10</strong>
+                                </div>
+                            </div>
+                            <p id="resEtlSummary" class="etl-explanation">ETL status will calculate automatically after pest species detection.</p>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════════
+                             AI OUTBREAK RISK FORECAST & SVG TRAJECTORY CURVE
+                        ══════════════════════════════════════════════════════════ -->
+                        <div class="forecast-card" id="pestForecastSection">
+                            <div class="forecast-header">
+                                <div>
+                                    <span class="forecast-eyebrow">AI Population Trajectory & Outbreak Risk</span>
+                                    <h3 id="resForecastHeadline">Outbreak Risk Assessment</h3>
+                                    <p id="resForecastTrend" class="forecast-trend-sub">Calculates population velocity and projects counts for Day +3 & Day +7</p>
+                                </div>
+                                <div class="risk-badge-large" id="resRiskBadge">NORMAL</div>
+                            </div>
+
+                            <!-- Velocity & Growth Chips -->
+                            <div class="forecast-velocity-row">
+                                <div class="velocity-chip" id="resVelocityChip">
+                                    <span class="velocity-icon">⚡</span>
+                                    <span>Population Velocity: <strong id="resDailyVelocity">0.0 pests/day</strong></span>
+                                </div>
+                                <div class="velocity-chip" id="resRateChip">
+                                    <span class="velocity-icon">📈</span>
+                                    <span>Rate of Change: <strong id="resGrowthPercent">0%</strong></span>
+                                </div>
+                                <div class="velocity-chip highlight-chip" id="resHorizonChip">
+                                    <span class="velocity-icon">🎯</span>
+                                    <span>Forecast Horizon: <strong>7 Days</strong></span>
+                                </div>
+                            </div>
+
+                            <!-- Interactive SVG Population Curve Chart -->
+                            <div class="trajectory-chart-card">
+                                <div class="chart-header">
+                                    <div class="chart-title">
+                                        <span>📈 Population Progression & Outbreak Curve</span>
+                                        <small>Past observations ➔ AI Non-linear Projections vs Scientific ETL</small>
+                                    </div>
+                                    <div class="chart-legend">
+                                        <span class="legend-item"><span class="legend-dot actual"></span> Observed</span>
+                                        <span class="legend-item"><span class="legend-dot forecast"></span> AI Forecast</span>
+                                        <span class="legend-item"><span class="legend-line etl"></span> ETL Limit</span>
+                                    </div>
+                                </div>
+
+                                <div class="svg-chart-container" id="svgChartContainer">
+                                    <svg id="pestTrajectorySvg" viewBox="0 0 520 180" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="chartGradientSafe" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                                                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                                            </linearGradient>
+                                            <linearGradient id="chartGradientHazard" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.45"/>
+                                                <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <!-- Gridlines, path, ETL line and dots dynamically drawn by script.js -->
+                                        <g id="svgGrid"></g>
+                                        <path id="svgArea" d="" fill="url(#chartGradientSafe)"></path>
+                                        <path id="svgPathActual" d="" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"></path>
+                                        <path id="svgPathForecast" d="" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6,4" stroke-linecap="round"></path>
+                                        <line id="svgEtlLine" x1="40" y1="90" x2="490" y2="90" stroke="#f87171" stroke-width="2" stroke-dasharray="4,4"></line>
+                                        <text id="svgEtlLabel" x="495" y="93" fill="#f87171" font-size="10" font-weight="bold">ETL</text>
+                                        <g id="svgPoints"></g>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Multi-Day Timeline Track -->
+                            <div class="trajectory-timeline-wrap">
+                                <div class="timeline-title-row">
+                                    <span>📅 5-Point Chronological Multi-Day Timeline</span>
+                                    <span class="timeline-hint">Red indicates breach of scientific ETL threshold</span>
+                                </div>
+                                <div class="timeline-container" id="resTimelineContainer">
+                                    <div class="timeline-step step-past">
+                                        <div class="step-badge">7 Days Ago</div>
+                                        <div class="step-count" id="stepCount7d">--</div>
+                                        <div class="step-tag">Observed</div>
+                                    </div>
+                                    <div class="timeline-connector"></div>
+                                    <div class="timeline-step step-past">
+                                        <div class="step-badge">3 Days Ago</div>
+                                        <div class="step-count" id="stepCount3d">--</div>
+                                        <div class="step-tag">Observed</div>
+                                    </div>
+                                    <div class="timeline-connector"></div>
+                                    <div class="timeline-step step-today">
+                                        <div class="step-badge">Today</div>
+                                        <div class="step-count" id="stepCountToday">0</div>
+                                        <div class="step-tag">Live Count</div>
+                                    </div>
+                                    <div class="timeline-connector dashed"></div>
+                                    <div class="timeline-step step-forecast">
+                                        <div class="step-badge">+3 Days</div>
+                                        <div class="step-count" id="stepCountPlus3">--</div>
+                                        <div class="step-tag">AI Forecast</div>
+                                    </div>
+                                    <div class="timeline-connector dashed"></div>
+                                    <div class="timeline-step step-forecast">
+                                        <div class="step-badge">+7 Days</div>
+                                        <div class="step-count" id="stepCountPlus7">--</div>
+                                        <div class="step-tag">AI Forecast</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Recommended Spray Intervention Window -->
+                            <div class="spray-window-card" id="resSprayWindowCard">
+                                <div class="spray-window-icon">⏱️</div>
+                                <div class="spray-window-body">
+                                    <strong id="resSprayWindowTitle">Recommended Spray Window (फवारणीची योग्य वेळ)</strong>
+                                    <p id="resSprayWindowText">Enter earlier days counts and run detection to calculate the precise spray window.</p>
+                                </div>
+                            </div>
+
+                            <!-- Continuous Field Surveillance Protocol -->
+                            <div class="monitoring-guidance-card">
+                                <div class="guidance-head">
+                                    <span>📡 Continuous Field Surveillance Protocol (सतत निरीक्षण मार्गदर्शक)</span>
+                                </div>
+                                <div class="guidance-grid">
+                                    <div class="guidance-item">
+                                        <span class="guidance-icon">🔄</span>
+                                        <div>
+                                            <strong>Re-Scouting Frequency</strong>
+                                            <p id="resScoutInterval">Inspect traps every 48–72 hours during active vegetative/flowering phase</p>
+                                        </div>
+                                    </div>
+                                    <div class="guidance-item">
+                                        <span class="guidance-icon">🪤</span>
+                                        <div>
+                                            <strong>Trap Density Standard</strong>
+                                            <p id="resTrapDensity">Install 5–8 pheromone traps/acre (or 12 sticky cards) across field borders</p>
+                                        </div>
+                                    </div>
+                                    <div class="guidance-item">
+                                        <span class="guidance-icon">🌦️</span>
+                                        <div>
+                                            <strong>Weather Advisory</strong>
+                                            <p id="resWeatherAdvisory">Warm humid conditions speed up larval instar transitions</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Symptoms & Description -->
+                        <div class="pest-detail-block">
+                            <h4>🔍 Crop Damage Symptoms & Diagnostic Patterns</h4>
+                            <ul id="resPestSymptoms" class="pest-bullet-list">
+                                <li>Identify pest to view specific visual damage patterns.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Integrated Pest Management (IPM) Tabs -->
+                        <div class="ipm-section">
+                            <div class="ipm-tabs">
+                                <button type="button" class="ipm-tab-btn active" id="ipmBioBtn">🌿 Organic & Biological</button>
+                                <button type="button" class="ipm-tab-btn" id="ipmChemBtn">🧪 Chemical Control</button>
+                                <button type="button" class="ipm-tab-btn" id="ipmPrevBtn">🛡️ Cultural Prevention</button>
+                            </div>
+
+                            <div id="ipmBioTab" class="ipm-content active">
+                                <ul id="resBiologicalList" class="pest-bullet-list">
+                                    <li>Install species-specific pheromone or sticky traps.</li>
+                                    <li>Conserve predatory beneficial insects (Ladybirds, Chrysoperla).</li>
+                                </ul>
+                            </div>
+
+                            <div id="ipmChemTab" class="ipm-content hidden">
+                                <ul id="resChemicalList" class="pest-bullet-list">
+                                    <li>Recommended CIB&RC approved insecticides and dosages will appear here.</li>
+                                </ul>
+                            </div>
+
+                            <div id="ipmPrevTab" class="ipm-content hidden">
+                                <ul id="resPreventionList" class="pest-bullet-list">
+                                    <li>Farm sanitation and rotation tips.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Smart Voice Readout Player Card -->
+                        <div class="pest-audio-player-card">
+                            <div class="audio-player-head">
+                                <div class="audio-title">
+                                    <span class="audio-icon">🔊</span>
+                                    <div>
+                                        <strong>Voice Advisory Player</strong>
+                                        <small>Listen to pest diagnosis and spray window out loud</small>
+                                    </div>
+                                </div>
+                                <div class="voice-lang-picker">
+                                    <label for="pestVoiceLang">Language:</label>
+                                    <select id="pestVoiceLang">
+                                        <option value="hi">Hindi (हिंदी)</option>
+                                        <option value="mr">Marathi (मराठी)</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="audio-controls-row">
+                                <button type="button" id="speakPestAdviceBtn" class="audio-play-btn">
+                                    <span id="audioPlayIcon">▶️</span>
+                                    <span id="audioPlayText">Play Audio Advisory</span>
+                                </button>
+                                <div class="audio-visualizer" id="audioVisualizer">
+                                    <span class="wave-bar"></span>
+                                    <span class="wave-bar"></span>
+                                    <span class="wave-bar"></span>
+                                    <span class="wave-bar"></span>
+                                    <span class="wave-bar"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Field Trap Logs Drawer -->
+                        <div class="recent-trap-logs-section">
+                            <div class="drawer-header" id="togglePestLogsBtn">
+                                <span>📋 Recent Field Trap Scans (मागील सापळा तपासण्या)</span>
+                                <span class="drawer-toggle-icon">▼</span>
+                            </div>
+                            <div class="drawer-body hidden" id="pestLogsDrawerBody">
+                                <div id="pestRecentLogsList" class="pest-logs-mini-grid">
+                                    <p class="empty-logs-text">No previous pest logs found yet. Scans will be archived here automatically.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pest Camera Modal -->
+            <div id="pestCameraModal" class="modal hidden">
+                <div class="modal-content">
+                    <video id="pestCameraStream" autoplay playsinline></video>
+                    <div class="camera-controls">
+                        <button id="pestSnapPhotoBtn" class="capture-btn">📸 Capture Pest Photo</button>
+                        <button id="pestFlipCameraBtn" class="mini-btn">🔄 Flip</button>
+                        <button id="pestCloseCameraBtn" class="close-btn">Cancel</button>
+                    </div>
+                </div>
             </div>
         </div>
 

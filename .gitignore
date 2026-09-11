@@ -6,14 +6,19 @@ backend/node_modules/
 backend/.env
 
 # Uploads directory
+uploads/
 backend/uploads/
 
 # Local databases
 backend/.db/
+backend/data/
 
-# ML Dataset (too large for git — download from Kaggle)
+# ML Dataset (too large for git — download from Kaggle / external storage)
 backend/dataset/
 backend/dataset.zip
+pest-dataset/cleaned/
+pest-dataset/pest/
+pest-dataset/split/
 *.zip
 
 # Trained ML Model (Included in git as it is lightweight ~680KB)

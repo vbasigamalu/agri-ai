@@ -185,6 +185,22 @@ checkAuth();
 // --- Logout ---
 logoutBtn.addEventListener("click", logout);
 
+// --- Guest Farmer Login ---
+const guestLoginBtn = document.getElementById("guestLoginBtn");
+if (guestLoginBtn) {
+    guestLoginBtn.addEventListener("click", () => {
+        currentUser = {
+            id: "guest",
+            name: "Guest Farmer",
+            role: "farmer",
+            district: "Maharashtra",
+            village: "General"
+        };
+        localStorage.setItem("agri_ai_user", JSON.stringify(currentUser));
+        showMainApp(currentUser);
+    });
+}
+
 function logout() {
     localStorage.removeItem("agri_ai_token");
     localStorage.removeItem("agri_ai_user");
@@ -795,9 +811,9 @@ async function loadHistory() {
                     <span class="history-badge ${badgeClass}">${confidence}% Match</span>
                 </div>
                 <strong class="history-disease">${item.diseaseName}</strong>
-                <p style="font-size: 0.85rem; color: var(--text-muted);">${item.alert || ''}</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">${item.alert || ""}</p>
                 <div class="history-stats">
-                    <div class="history-stat-item">🌡️ <span>${item.temperature}°C</span></div>
+                    <div class="history-stat-item">🌡️ <span>${item.temperature}&deg;C</span></div>
                     <div class="history-stat-item">💧 <span>${item.humidity}%</span></div>
                 </div>
             `;
@@ -808,3 +824,882 @@ async function loadHistory() {
     }
 }
 
+// ═══════════════════════════════════════════════
+//  MAIN APP TAB SWITCHER (Advisor, Pest, History)
+// ═══════════════════════════════════════════════
+document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-target");
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        document.querySelectorAll(".tab-content").forEach(content => {
+            content.classList.add("hidden");
+            content.classList.remove("active");
+        });
+
+        const targetContent = document.getElementById(targetId);
+        if (targetContent) {
+            targetContent.classList.remove("hidden");
+            targetContent.classList.add("active");
+        }
+
+        if (targetId === "historyTab") {
+            loadHistory();
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════
+//  PEST MONITORING, EARLIER DAYS & OUTBREAK RISK FORECASTING (UPGRADED)
+// ═══════════════════════════════════════════════
+let pestSelectedFile = null;
+let currentPestResult = null;
+let pestMediaStream = null;
+let pestCameraFacing = "environment";
+
+const pestImageInput = document.getElementById("pestImageInput");
+const pestFileLabel = document.getElementById("pestFileLabel");
+const pestPreviewContainer = document.getElementById("pestPreviewContainer");
+const pestPreviewImg = document.getElementById("pestPreviewImg");
+const pestRemoveImgBtn = document.getElementById("pestRemoveImgBtn");
+const pestRetakeBtn = document.getElementById("pestRetakeBtn");
+const pestUploadLabel = document.getElementById("pestUploadLabel");
+const detectPestBtn = document.getElementById("detectPestBtn");
+const pestStatusMsg = document.getElementById("pestStatusMsg");
+const manualTrapCountInput = document.getElementById("manualTrapCount");
+const pestCropSelect = document.getElementById("pestCropSelect");
+const past7DaysCountInput = document.getElementById("past7DaysCount");
+const past3DaysCountInput = document.getElementById("past3DaysCount");
+
+const slider7d = document.getElementById("slider7d");
+const slider3d = document.getElementById("slider3d");
+const sliderToday = document.getElementById("sliderToday");
+
+// Two-way synchronization between number input and touch range slider
+function syncSliderToInput(slider, input) {
+    if (!slider || !input) return;
+    slider.addEventListener("input", () => {
+        input.value = slider.value;
+        updateLiveVelocity();
+    });
+    input.addEventListener("input", () => {
+        slider.value = input.value || 0;
+        updateLiveVelocity();
+    });
+}
+syncSliderToInput(slider7d, past7DaysCountInput);
+syncSliderToInput(slider3d, past3DaysCountInput);
+syncSliderToInput(sliderToday, manualTrapCountInput);
+
+// Stepper Buttons (+ / -)
+document.querySelectorAll(".stepper-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-step");
+        const dir = parseInt(btn.getAttribute("data-dir"), 10) || 1;
+        const targetInput = document.getElementById(targetId);
+        if (targetInput) {
+            let val = parseInt(targetInput.value, 10);
+            if (isNaN(val)) val = 0;
+            val = Math.max(0, val + dir);
+            targetInput.value = val;
+            targetInput.dispatchEvent(new Event("input"));
+        }
+    });
+});
+
+// Live Growth Velocity Preview
+function updateLiveVelocity() {
+    const c7Raw = past7DaysCountInput ? past7DaysCountInput.value : "";
+    const c3Raw = past3DaysCountInput ? past3DaysCountInput.value : "";
+    const cTRaw = manualTrapCountInput ? manualTrapCountInput.value : "0";
+
+    const previewEl = document.getElementById("previewVelocityText");
+    const previewDot = document.querySelector(".preview-dot");
+    if (!previewEl) return;
+
+    const cT = parseFloat(cTRaw) || 0;
+    const c7 = c7Raw !== "" ? parseFloat(c7Raw) : null;
+    const c3 = c3Raw !== "" ? parseFloat(c3Raw) : null;
+
+    if (c7 !== null && !isNaN(c7)) {
+        const diff = cT - c7;
+        const daily = (diff / 7).toFixed(1);
+        const sign = diff > 0 ? "+" : "";
+        const rate = c7 > 0 ? Math.round((diff / c7) * 100) : (cT > 0 ? 100 : 0);
+        const rateSign = rate > 0 ? "+" : "";
+
+        if (diff > 0) {
+            previewEl.innerHTML = `⚠️ Population Growth: <strong>${sign}${daily} pests/day (${rateSign}${rate}%)</strong>. Surge risk imminent!`;
+            previewEl.style.color = "#fcd34d";
+            if (previewDot) { previewDot.style.background = "#f59e0b"; previewDot.style.boxShadow = "0 0 8px #f59e0b"; }
+        } else if (diff < 0) {
+            previewEl.innerHTML = `🟢 Population Suppressed: <strong>${daily} pests/day (${rate}%)</strong>. Infestation is receding.`;
+            previewEl.style.color = "#6ee7b7";
+            if (previewDot) { previewDot.style.background = "#10b981"; previewDot.style.boxShadow = "0 0 8px #10b981"; }
+        } else {
+            previewEl.innerHTML = `⚖️ Stable Population: <strong>0.0 pests/day</strong> over 7-day monitoring window.`;
+            previewEl.style.color = "#93c5fd";
+            if (previewDot) { previewDot.style.background = "#3b82f6"; previewDot.style.boxShadow = "0 0 8px #3b82f6"; }
+        }
+    } else if (c3 !== null && !isNaN(c3)) {
+        const diff = cT - c3;
+        const daily = (diff / 3).toFixed(1);
+        const sign = diff > 0 ? "+" : "";
+        previewEl.innerHTML = `📈 3-day Growth Velocity: <strong>${sign}${daily} pests/day</strong>.`;
+        previewEl.style.color = diff > 0 ? "#fcd34d" : "#6ee7b7";
+    } else {
+        previewEl.textContent = "Enter earlier counts above to compute instant population velocity";
+        previewEl.style.color = "#93c5fd";
+        if (previewDot) { previewDot.style.background = "#3b82f6"; previewDot.style.boxShadow = "0 0 8px #3b82f6"; }
+    }
+}
+
+// Scenario Preset Buttons
+document.querySelectorAll(".scenario-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const scenario = btn.getAttribute("data-scenario");
+        if (scenario === "surge") {
+            if (past7DaysCountInput) past7DaysCountInput.value = 2;
+            if (past3DaysCountInput) past3DaysCountInput.value = 8;
+            if (manualTrapCountInput) manualTrapCountInput.value = 22;
+        } else if (scenario === "moderate") {
+            if (past7DaysCountInput) past7DaysCountInput.value = 3;
+            if (past3DaysCountInput) past3DaysCountInput.value = 6;
+            if (manualTrapCountInput) manualTrapCountInput.value = 9;
+        } else if (scenario === "declining") {
+            if (past7DaysCountInput) past7DaysCountInput.value = 18;
+            if (past3DaysCountInput) past3DaysCountInput.value = 8;
+            if (manualTrapCountInput) manualTrapCountInput.value = 2;
+        } else if (scenario === "clear") {
+            if (past7DaysCountInput) past7DaysCountInput.value = "";
+            if (past3DaysCountInput) past3DaysCountInput.value = "";
+            if (manualTrapCountInput) manualTrapCountInput.value = 0;
+        }
+
+        if (slider7d) slider7d.value = past7DaysCountInput ? (past7DaysCountInput.value || 0) : 0;
+        if (slider3d) slider3d.value = past3DaysCountInput ? (past3DaysCountInput.value || 0) : 0;
+        if (sliderToday) sliderToday.value = manualTrapCountInput ? (manualTrapCountInput.value || 0) : 0;
+
+        updateLiveVelocity();
+    });
+});
+
+// File Selection
+if (pestImageInput) {
+    pestImageInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        handlePestFile(file);
+    });
+}
+
+function handlePestFile(file) {
+    pestSelectedFile = file;
+    if (pestFileLabel) pestFileLabel.textContent = `Selected: ${file.name}`;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (pestPreviewImg) pestPreviewImg.src = e.target.result;
+        if (pestPreviewContainer) pestPreviewContainer.classList.remove("hidden");
+        if (pestUploadLabel) pestUploadLabel.classList.add("hidden");
+    };
+    reader.readAsDataURL(file);
+}
+
+// Remove File
+if (pestRemoveImgBtn) {
+    pestRemoveImgBtn.addEventListener("click", () => {
+        pestSelectedFile = null;
+        if (pestImageInput) pestImageInput.value = "";
+        if (pestPreviewImg) pestPreviewImg.src = "";
+        if (pestPreviewContainer) pestPreviewContainer.classList.add("hidden");
+        if (pestUploadLabel) pestUploadLabel.classList.remove("hidden");
+        if (pestFileLabel) pestFileLabel.textContent = "Click or drag Pest Photo to upload";
+    });
+}
+
+if (pestRetakeBtn) {
+    pestRetakeBtn.addEventListener("click", () => {
+        if (pestImageInput) pestImageInput.click();
+    });
+}
+
+// Drag and drop for pest upload box
+const pestDropZone = document.getElementById("pestDropZone");
+if (pestDropZone) {
+    pestDropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        pestDropZone.style.borderColor = "var(--primary)";
+    });
+    pestDropZone.addEventListener("dragleave", () => {
+        pestDropZone.style.borderColor = "var(--glass-border)";
+    });
+    pestDropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        pestDropZone.style.borderColor = "var(--glass-border)";
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handlePestFile(e.dataTransfer.files[0]);
+        }
+    });
+}
+
+// Live Camera Action for Pest & Trap Scanner
+const openPestCameraBtn = document.getElementById("openPestCameraBtn");
+const pestCameraModal = document.getElementById("pestCameraModal");
+const pestCameraStream = document.getElementById("pestCameraStream");
+const pestSnapPhotoBtn = document.getElementById("pestSnapPhotoBtn");
+const pestFlipCameraBtn = document.getElementById("pestFlipCameraBtn");
+const pestCloseCameraBtn = document.getElementById("pestCloseCameraBtn");
+
+async function startPestCamera() {
+    if (pestMediaStream) stopPestCamera();
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Camera feature requires a Secure Context (HTTPS) or localhost. ❌");
+        return;
+    }
+
+    try {
+        pestMediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: pestCameraFacing }
+        });
+        if (pestCameraStream) pestCameraStream.srcObject = pestMediaStream;
+        if (pestCameraModal) pestCameraModal.classList.remove("hidden");
+    } catch (err) {
+        console.error("Pest Camera Error:", err);
+        alert("Camera access denied! Check permissions and browser settings. ❌");
+    }
+}
+
+function stopPestCamera() {
+    if (pestMediaStream) {
+        pestMediaStream.getTracks().forEach(track => track.stop());
+        pestMediaStream = null;
+    }
+    if (pestCameraModal) pestCameraModal.classList.add("hidden");
+    if (pestCameraStream) pestCameraStream.srcObject = null;
+}
+
+if (openPestCameraBtn) openPestCameraBtn.addEventListener("click", startPestCamera);
+if (pestCloseCameraBtn) pestCloseCameraBtn.addEventListener("click", stopPestCamera);
+if (pestFlipCameraBtn) {
+    pestFlipCameraBtn.addEventListener("click", () => {
+        pestCameraFacing = pestCameraFacing === "environment" ? "user" : "environment";
+        startPestCamera();
+    });
+}
+
+if (pestSnapPhotoBtn) {
+    pestSnapPhotoBtn.addEventListener("click", () => {
+        if (!pestCameraStream) return;
+        const canvas = document.createElement("canvas");
+        canvas.width = pestCameraStream.videoWidth || 640;
+        canvas.height = pestCameraStream.videoHeight || 480;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(pestCameraStream, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+            const captured = new File([blob], `pest-live-${Date.now()}.jpg`, { type: "image/jpeg" });
+            handlePestFile(captured);
+            stopPestCamera();
+        }, "image/jpeg", 0.92);
+    });
+}
+
+// Pest Encyclopedia Search Filter
+const pestSearchInput = document.getElementById("pestSearchInput");
+if (pestSearchInput) {
+    pestSearchInput.addEventListener("input", (e) => {
+        const query = (e.target.value || "").toLowerCase().trim();
+        document.querySelectorAll(".pest-tag-card").forEach(card => {
+            const text = card.textContent.toLowerCase();
+            const pestKey = card.getAttribute("data-pest") || "";
+            if (!query || text.includes(query) || pestKey.includes(query)) {
+                card.style.display = "flex";
+            } else {
+                card.style.display = "none";
+            }
+        });
+    });
+}
+
+// Pest Encyclopedia Cards Click (Interactive Pre-fill & Simulation)
+const PEST_CROP_MAP = {
+    "aphids": "Mustard",
+    "armyworm": "Maize",
+    "beetle": "Tomato",
+    "bollworm": "Cotton",
+    "grasshopper": "Paddy (Rice)",
+    "mites": "Chilli",
+    "mosquito": "General Crop",
+    "sawfly": "Mustard",
+    "stem_borer": "Paddy (Rice)"
+};
+
+document.querySelectorAll(".pest-tag-card").forEach(card => {
+    card.addEventListener("click", () => {
+        const pestKey = card.getAttribute("data-pest");
+        if (!pestKey) return;
+
+        // Auto select corresponding crop
+        if (pestCropSelect && PEST_CROP_MAP[pestKey]) {
+            pestCropSelect.value = PEST_CROP_MAP[pestKey];
+        }
+
+        // Set realistic multi-day values
+        if (past7DaysCountInput) { past7DaysCountInput.value = 3; if (slider7d) slider7d.value = 3; }
+        if (past3DaysCountInput) { past3DaysCountInput.value = 8; if (slider3d) slider3d.value = 8; }
+        if (manualTrapCountInput) { manualTrapCountInput.value = 19; if (sliderToday) sliderToday.value = 19; }
+        updateLiveVelocity();
+
+        // Create sample photo canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = 400;
+        canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+        const grad = ctx.createLinearGradient(0, 0, 400, 300);
+        grad.addColorStop(0, "#0f172a");
+        grad.addColorStop(1, "#1e293b");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 400, 300);
+        ctx.fillStyle = "#10b981";
+        ctx.font = "bold 24px Outfit, sans-serif";
+        ctx.fillText(`🌾 ${pestKey.replace("_", " ").toUpperCase()}`, 30, 130);
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "15px sans-serif";
+        ctx.fillText("Field Trap Specimen • Ready for AI Surveillance", 30, 170);
+
+        canvas.toBlob((blob) => {
+            const fakeFile = new File([blob], `${pestKey}_trap_sample.jpg`, { type: "image/jpeg" });
+            handlePestFile(fakeFile);
+            if (pestFileLabel) pestFileLabel.textContent = `Sample: ${pestKey.toUpperCase()}`;
+        });
+    });
+});
+
+// Detect Pest Button Handler
+if (detectPestBtn) {
+    detectPestBtn.addEventListener("click", async () => {
+        if (!pestSelectedFile) {
+            pestStatusMsg.innerText = "Please select, capture, or click a pest photo sample first!";
+            pestStatusMsg.style.color = "var(--accent)";
+            return;
+        }
+
+        detectPestBtn.disabled = true;
+        detectPestBtn.innerHTML = `<span>Forecasting Outbreak Risk...</span>`;
+        pestStatusMsg.innerText = "Processing image, calculating multi-day growth velocity & risk forecast...";
+        pestStatusMsg.style.color = "var(--primary-light)";
+
+        const formData = new FormData();
+        formData.append("image", pestSelectedFile);
+        formData.append("crop", pestCropSelect ? pestCropSelect.value : "General Crop");
+        formData.append("trapCount", manualTrapCountInput ? (manualTrapCountInput.value || 0) : 0);
+
+        if (past3DaysCountInput && past3DaysCountInput.value !== "") {
+            formData.append("past3DaysCount", past3DaysCountInput.value);
+        }
+        if (past7DaysCountInput && past7DaysCountInput.value !== "") {
+            formData.append("past7DaysCount", past7DaysCountInput.value);
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/pest/detect`, {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Pest analysis failed");
+            }
+
+            currentPestResult = data;
+            displayPestResults(data);
+            pestStatusMsg.innerText = "✅ Pest identified & outbreak risk forecast generated!";
+            pestStatusMsg.style.color = "var(--primary-light)";
+
+            // Refresh recent history list if drawer is open
+            if (pestLogsDrawerBody && !pestLogsDrawerBody.classList.contains("hidden")) {
+                loadPestHistory();
+            }
+
+        } catch (err) {
+            console.error("Pest detection error:", err);
+            pestStatusMsg.innerText = `Error: ${err.message}`;
+            pestStatusMsg.style.color = "#ef4444";
+        } finally {
+            detectPestBtn.disabled = false;
+            detectPestBtn.innerHTML = `<span>🔍 Detect Pest Species & Forecast Outbreak Risk</span> 🚀`;
+        }
+    });
+}
+
+// Display Pest Detection & Trajectory Forecast Results
+function displayPestResults(data) {
+    const pest = data.pest;
+    const info = data.infestation;
+    const forecast = data.forecast || {};
+    const reco = data.recommendations || {};
+
+    const pestNameEl = document.getElementById("resPestName");
+    if (pestNameEl) pestNameEl.textContent = `${pest.name} ${pest.vernacular ? "(" + pest.vernacular + ")" : ""}`;
+    const pestSciEl = document.getElementById("resPestScientific");
+    if (pestSciEl) pestSciEl.textContent = pest.scientificName || "Insect Pest";
+    const pestConfEl = document.getElementById("resPestConfidence");
+    if (pestConfEl) pestConfEl.textContent = `${Math.round(pest.confidence * 100)}% Match`;
+
+    const badge = document.getElementById("resSeverityBadge");
+    if (badge) {
+        badge.textContent = info.severity;
+        badge.style.color = info.statusColor;
+        badge.style.background = `${info.statusColor}22`;
+        badge.style.border = `1px solid ${info.statusColor}66`;
+    }
+
+    const trapCountEl = document.getElementById("resTrapCount");
+    if (trapCountEl) trapCountEl.textContent = info.trapCount;
+    const threshEl = document.getElementById("resThresholdLimit");
+    if (threshEl) threshEl.textContent = `${info.threshold} ${info.unit}`;
+    const etlSumEl = document.getElementById("resEtlSummary");
+    if (etlSumEl) etlSumEl.innerHTML = info.summaryText;
+
+    // 3-Zone Gauge Needle Positioning
+    const ratio = info.threshold > 0 ? (info.trapCount / info.threshold) : 0;
+    const ratioEl = document.getElementById("resEtlRatio");
+    if (ratioEl) {
+        ratioEl.textContent = `${ratio.toFixed(1)}x`;
+        ratioEl.style.color = ratio >= 1.0 ? "#ef4444" : (ratio >= 0.5 ? "#f59e0b" : "#10b981");
+    }
+
+    const needlePercent = ratio <= 1.0 
+        ? Math.max(4, ratio * 50)
+        : Math.min(96, 50 + ((ratio - 1.0) / 1.5) * 46);
+
+    const bar = document.getElementById("etlBarFill");
+    if (bar) {
+        bar.style.left = `${needlePercent}%`;
+    }
+
+    // Outbreak Risk Forecast
+    const headlineEl = document.getElementById("resForecastHeadline");
+    if (headlineEl && forecast.alertHeadline) headlineEl.textContent = forecast.alertHeadline;
+
+    const trendEl = document.getElementById("resForecastTrend");
+    if (trendEl && forecast.trend) trendEl.textContent = `${forecast.trend} — ${forecast.actionRecommendation || ""}`;
+
+    const riskBadge = document.getElementById("resRiskBadge");
+    if (riskBadge && forecast.riskLevel) {
+        riskBadge.textContent = forecast.riskLevel;
+        riskBadge.style.color = forecast.riskColor || "#10b981";
+        riskBadge.style.background = `${forecast.riskColor || "#10b981"}22`;
+        riskBadge.style.border = `1px solid ${forecast.riskColor || "#10b981"}55`;
+    }
+
+    const velEl = document.getElementById("resDailyVelocity");
+    if (velEl) {
+        const velSign = forecast.dailyVelocity > 0 ? "+" : "";
+        velEl.textContent = `${velSign}${forecast.dailyVelocity || 0} pests/day`;
+    }
+
+    const rateEl = document.getElementById("resGrowthPercent");
+    if (rateEl) {
+        const rateSign = forecast.growthRatePercent > 0 ? "+" : "";
+        rateEl.textContent = `${rateSign}${forecast.growthRatePercent || 0}%`;
+    }
+
+    // 5-Point Timeline Cards
+    const c7d = past7DaysCountInput && past7DaysCountInput.value !== "" ? past7DaysCountInput.value : "--";
+    const c3d = past3DaysCountInput && past3DaysCountInput.value !== "" ? past3DaysCountInput.value : "--";
+    const cToday = info.trapCount || 0;
+    const cPlus3 = forecast.projectedIn3Days !== undefined ? forecast.projectedIn3Days : "--";
+    const cPlus7 = forecast.projectedIn7Days !== undefined ? forecast.projectedIn7Days : "--";
+
+    const s7 = document.getElementById("stepCount7d");
+    if (s7) s7.textContent = c7d;
+    const s3 = document.getElementById("stepCount3d");
+    if (s3) s3.textContent = c3d;
+    const sT = document.getElementById("stepCountToday");
+    if (sT) sT.textContent = cToday;
+    const sP3 = document.getElementById("stepCountPlus3");
+    if (sP3) sP3.textContent = cPlus3;
+    const sP7 = document.getElementById("stepCountPlus7");
+    if (sP7) sP7.textContent = cPlus7;
+
+    const p3Step = sP3 ? sP3.closest(".timeline-step") : null;
+    if (p3Step) {
+        if (forecast.projectedIn3Days >= info.threshold) {
+            p3Step.classList.add("step-critical");
+        } else {
+            p3Step.classList.remove("step-critical");
+        }
+    }
+
+    const p7Step = sP7 ? sP7.closest(".timeline-step") : null;
+    if (p7Step) {
+        if (forecast.projectedIn7Days >= info.threshold) {
+            p7Step.classList.add("step-critical");
+        } else {
+            p7Step.classList.remove("step-critical");
+        }
+    }
+
+    // Draw SVG Trajectory Curve Chart
+    drawTrajectorySvg(forecast, info);
+
+    // Recommended Spray Window
+    const sprayTextEl = document.getElementById("resSprayWindowText");
+    if (sprayTextEl && forecast.sprayWindow) {
+        sprayTextEl.innerHTML = `<strong>${forecast.sprayWindow}</strong>`;
+    }
+
+    // Continuous Surveillance Guidance
+    const scoutEl = document.getElementById("resScoutInterval");
+    if (scoutEl && forecast.riskLevel) {
+        if (forecast.riskLevel.includes("CRITICAL") || forecast.riskLevel.includes("HIGH")) {
+            scoutEl.textContent = "Immediate intervention required. Re-scout traps every 24–48 hours to evaluate knockdown efficiency.";
+        } else {
+            scoutEl.textContent = "Inspect traps every 48–72 hours during active vegetative/flowering phase.";
+        }
+    }
+
+    // Symptoms
+    const sympList = document.getElementById("resPestSymptoms");
+    if (sympList) {
+        sympList.innerHTML = "";
+        (reco.symptoms || []).forEach(s => {
+            const li = document.createElement("li");
+            li.textContent = s;
+            sympList.appendChild(li);
+        });
+    }
+
+    // Biological Control
+    const bioList = document.getElementById("resBiologicalList");
+    if (bioList) {
+        bioList.innerHTML = "";
+        (reco.biologicalControl || []).forEach(b => {
+            const li = document.createElement("li");
+            li.textContent = b;
+            bioList.appendChild(li);
+        });
+    }
+
+    // Chemical Control
+    const chemList = document.getElementById("resChemicalList");
+    if (chemList) {
+        chemList.innerHTML = "";
+        (reco.chemicalControl || []).forEach(c => {
+            const li = document.createElement("li");
+            li.textContent = c;
+            chemList.appendChild(li);
+        });
+    }
+
+    // Cultural Prevention
+    const prevList = document.getElementById("resPreventionList");
+    if (prevList) {
+        prevList.innerHTML = "";
+        (reco.prevention || []).forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = p;
+            prevList.appendChild(li);
+        });
+    }
+}
+
+// Draw Smooth Interactive SVG Trajectory Curve Chart
+function drawTrajectorySvg(forecast, info) {
+    const svg = document.getElementById("pestTrajectorySvg");
+    const gridG = document.getElementById("svgGrid");
+    const pointsG = document.getElementById("svgPoints");
+    const pathActual = document.getElementById("svgPathActual");
+    const pathForecast = document.getElementById("svgPathForecast");
+    const pathArea = document.getElementById("svgArea");
+    const etlLine = document.getElementById("svgEtlLine");
+    const etlLabel = document.getElementById("svgEtlLabel");
+
+    if (!svg || !forecast || !info) return;
+
+    const c7d = past7DaysCountInput && past7DaysCountInput.value !== "" ? parseFloat(past7DaysCountInput.value) : 0;
+    const c3d = past3DaysCountInput && past3DaysCountInput.value !== "" ? parseFloat(past3DaysCountInput.value) : c7d;
+    const cToday = parseFloat(info.trapCount) || 0;
+    const cP3 = forecast.projectedIn3Days !== undefined ? parseFloat(forecast.projectedIn3Days) : cToday;
+    const cP7 = forecast.projectedIn7Days !== undefined ? parseFloat(forecast.projectedIn7Days) : cP3;
+    const threshold = parseFloat(info.threshold) || 10;
+
+    const values = [c7d, c3d, cToday, cP3, cP7];
+    const maxVal = Math.max(threshold * 1.4, ...values, 10);
+
+    const xCoords = [60, 160, 260, 360, 460];
+    const topY = 25;
+    const botY = 145;
+
+    const getY = (v) => botY - ((Math.min(maxVal, Math.max(0, v)) / maxVal) * (botY - topY));
+
+    // Draw Gridlines
+    if (gridG) {
+        gridG.innerHTML = "";
+        [0, 0.5, 1].forEach(fraction => {
+            const gy = botY - fraction * (botY - topY);
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", "40");
+            line.setAttribute("y1", gy);
+            line.setAttribute("x2", "480");
+            line.setAttribute("y2", gy);
+            line.setAttribute("stroke", "rgba(255, 255, 255, 0.08)");
+            line.setAttribute("stroke-dasharray", "3,3");
+            gridG.appendChild(line);
+
+            const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            txt.setAttribute("x", "34");
+            txt.setAttribute("y", gy + 3);
+            txt.setAttribute("fill", "rgba(148, 163, 184, 0.6)");
+            txt.setAttribute("font-size", "9");
+            txt.setAttribute("text-anchor", "end");
+            txt.textContent = Math.round(fraction * maxVal);
+            gridG.appendChild(txt);
+        });
+    }
+
+    // ETL Threshold Line
+    const etlY = getY(threshold);
+    if (etlLine) {
+        etlLine.setAttribute("x1", "40");
+        etlLine.setAttribute("y1", etlY);
+        etlLine.setAttribute("x2", "480");
+        etlLine.setAttribute("y2", etlY);
+        etlLine.setAttribute("stroke", "#f87171");
+        etlLine.setAttribute("stroke-width", "2");
+        etlLine.setAttribute("stroke-dasharray", "4,4");
+    }
+    if (etlLabel) {
+        etlLabel.setAttribute("x", "484");
+        etlLabel.setAttribute("y", etlY + 3);
+        etlLabel.textContent = `ETL (${threshold})`;
+    }
+
+    // Points Coordinates
+    const pts = [
+        { x: xCoords[0], y: getY(c7d), val: c7d, type: "actual" },
+        { x: xCoords[1], y: getY(c3d), val: c3d, type: "actual" },
+        { x: xCoords[2], y: getY(cToday), val: cToday, type: "today" },
+        { x: xCoords[3], y: getY(cP3), val: cP3, type: "forecast" },
+        { x: xCoords[4], y: getY(cP7), val: cP7, type: "forecast" }
+    ];
+
+    // Build SVG Smooth Bezier Paths
+    // Actual curve: pts[0] -> pts[1] -> pts[2]
+    const dActual = `M ${pts[0].x} ${pts[0].y} Q ${(pts[0].x + pts[1].x) / 2} ${(pts[0].y + pts[1].y) / 2 - 4}, ${pts[1].x} ${pts[1].y} T ${pts[2].x} ${pts[2].y}`;
+    if (pathActual) pathActual.setAttribute("d", dActual);
+
+    // Forecast curve: pts[2] -> pts[3] -> pts[4]
+    const dForecast = `M ${pts[2].x} ${pts[2].y} Q ${(pts[2].x + pts[3].x) / 2} ${(pts[2].y + pts[3].y) / 2 - 4}, ${pts[3].x} ${pts[3].y} T ${pts[4].x} ${pts[4].y}`;
+    if (pathForecast) {
+        pathForecast.setAttribute("d", dForecast);
+        const isHazard = cP7 >= threshold || cP3 >= threshold;
+        pathForecast.setAttribute("stroke", isHazard ? "#ef4444" : "#f59e0b");
+    }
+
+    // Area Fill
+    if (pathArea) {
+        const dArea = `${dActual} L ${pts[2].x} ${pts[2].y} Q ${(pts[2].x + pts[3].x) / 2} ${(pts[2].y + pts[3].y) / 2 - 4}, ${pts[3].x} ${pts[3].y} T ${pts[4].x} ${pts[4].y} L ${pts[4].x} ${botY} L ${pts[0].x} ${botY} Z`;
+        pathArea.setAttribute("d", dArea);
+        const isHazard = cP7 >= threshold || cToday >= threshold;
+        pathArea.setAttribute("fill", isHazard ? "url(#chartGradientHazard)" : "url(#chartGradientSafe)");
+    }
+
+    // Draw Points & Tooltip Labels
+    if (pointsG) {
+        pointsG.innerHTML = "";
+        pts.forEach((p) => {
+            const isCritical = p.val >= threshold;
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p.x);
+            circle.setAttribute("cy", p.y);
+            circle.setAttribute("r", p.type === "today" ? "6" : "4.5");
+            circle.setAttribute("fill", isCritical ? "#ef4444" : (p.type === "actual" ? "#3b82f6" : "#f59e0b"));
+            circle.setAttribute("stroke", "#ffffff");
+            circle.setAttribute("stroke-width", "2");
+            pointsG.appendChild(circle);
+
+            // Text Count Label above point
+            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.setAttribute("x", p.x);
+            label.setAttribute("y", Math.max(12, p.y - 10));
+            label.setAttribute("fill", isCritical ? "#f87171" : "#f8fafc");
+            label.setAttribute("font-size", "10");
+            label.setAttribute("font-weight", "bold");
+            label.setAttribute("text-anchor", "middle");
+            label.textContent = Math.round(p.val);
+            pointsG.appendChild(label);
+        });
+    }
+}
+
+// IPM Tabs Switcher
+const ipmBioBtn = document.getElementById("ipmBioBtn");
+const ipmChemBtn = document.getElementById("ipmChemBtn");
+const ipmPrevBtn = document.getElementById("ipmPrevBtn");
+const ipmBioTab = document.getElementById("ipmBioTab");
+const ipmChemTab = document.getElementById("ipmChemTab");
+const ipmPrevTab = document.getElementById("ipmPrevTab");
+
+if (ipmBioBtn && ipmChemBtn && ipmPrevBtn) {
+    ipmBioBtn.addEventListener("click", () => switchIpm("bio"));
+    ipmChemBtn.addEventListener("click", () => switchIpm("chem"));
+    ipmPrevBtn.addEventListener("click", () => switchIpm("prev"));
+}
+
+function switchIpm(type) {
+    [ipmBioBtn, ipmChemBtn, ipmPrevBtn].forEach(b => b && b.classList.remove("active"));
+    [ipmBioTab, ipmChemTab, ipmPrevTab].forEach(t => { if (t) { t.classList.add("hidden"); t.classList.remove("active"); } });
+
+    if (type === "bio") {
+        if (ipmBioBtn) ipmBioBtn.classList.add("active");
+        if (ipmBioTab) { ipmBioTab.classList.remove("hidden"); ipmBioTab.classList.add("active"); }
+    } else if (type === "chem") {
+        if (ipmChemBtn) ipmChemBtn.classList.add("active");
+        if (ipmChemTab) { ipmChemTab.classList.remove("hidden"); ipmChemTab.classList.add("active"); }
+    } else if (type === "prev") {
+        if (ipmPrevBtn) ipmPrevBtn.classList.add("active");
+        if (ipmPrevTab) { ipmPrevTab.classList.remove("hidden"); ipmPrevTab.classList.add("active"); }
+    }
+}
+
+// Multi-Lingual TTS Voice Player
+const speakPestAdviceBtn = document.getElementById("speakPestAdviceBtn");
+const pestVoiceLang = document.getElementById("pestVoiceLang");
+const audioVisualizer = document.getElementById("audioVisualizer");
+const audioPlayText = document.getElementById("audioPlayText");
+const audioPlayIcon = document.getElementById("audioPlayIcon");
+
+if (speakPestAdviceBtn) {
+    speakPestAdviceBtn.addEventListener("click", () => {
+        if (!currentPestResult) {
+            alert("Please detect a pest or run a simulation first! 🦗");
+            return;
+        }
+
+        const pest = currentPestResult.pest || {};
+        const info = currentPestResult.infestation || {};
+        const forecast = currentPestResult.forecast || {};
+        const lang = pestVoiceLang ? pestVoiceLang.value : "hi";
+
+        let text = "";
+        let voiceName = "Hindi Female";
+
+        if (lang === "mr") {
+            // Marathi
+            text = `सापळा अहवाल: सापडलेला कीटक ${pest.name}, स्थानिक नाव ${pest.vernacular || ""}. सध्याची तीव्रता ${info.severity}. सापळ्यात ${info.trapCount} कीटक आढळले, मर्यादा ${info.threshold} आहे. ${forecast.alertHeadline || ""}. योग्य फवारणी वेळ: ${forecast.sprayWindow || ""}.`;
+            voiceName = "Hindi Female";
+        } else if (lang === "hi") {
+            // Hindi
+            text = `कीट एवं ट्रैप रिपोर्ट: पहचाना गया कीट ${pest.name} ${pest.vernacular ? "(" + pest.vernacular + ")" : ""}. वर्तमान स्थिति ${info.severity}. ट्रैप गणना ${info.trapCount} है जबकि आर्थिक दहलीज ${info.threshold} है. ${forecast.alertHeadline || ""}. अनुशंसित छिड़काव समय: ${forecast.sprayWindow || ""}.`;
+            voiceName = "Hindi Female";
+        } else {
+            // English
+            text = `Pest Surveillance Report: Identified pest is ${pest.name}. Current severity status is ${info.severity}. Observed trap count is ${info.trapCount} against economic threshold ${info.threshold}. ${forecast.alertHeadline || ""}. Spray window: ${forecast.sprayWindow || ""}.`;
+            voiceName = "UK English Female";
+        }
+
+        if (audioVisualizer) audioVisualizer.classList.add("playing");
+        if (audioPlayText) audioPlayText.textContent = "Speaking Advisory...";
+        if (audioPlayIcon) audioPlayIcon.textContent = "🔊";
+
+        const resetAudioUI = () => {
+            if (audioVisualizer) audioVisualizer.classList.remove("playing");
+            if (audioPlayText) audioPlayText.textContent = "Play Audio Advisory";
+            if (audioPlayIcon) audioPlayIcon.textContent = "▶️";
+        };
+
+        if (window.responsiveVoice && responsiveVoice.voiceSupport && responsiveVoice.voiceSupport()) {
+            responsiveVoice.speak(text, voiceName, {
+                rate: 0.95,
+                onend: resetAudioUI,
+                onerror: resetAudioUI
+            });
+        } else if ("speechSynthesis" in window) {
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = lang === "mr" ? "mr-IN" : (lang === "hi" ? "hi-IN" : "en-IN");
+            utter.rate = 0.95;
+            utter.onend = resetAudioUI;
+            utter.onerror = resetAudioUI;
+            window.speechSynthesis.speak(utter);
+        } else {
+            resetAudioUI();
+            alert(text);
+        }
+    });
+}
+
+// Recent Field Trap Scans Drawer
+const togglePestLogsBtn = document.getElementById("togglePestLogsBtn");
+const pestLogsDrawerBody = document.getElementById("pestLogsDrawerBody");
+const pestRecentLogsList = document.getElementById("pestRecentLogsList");
+
+if (togglePestLogsBtn && pestLogsDrawerBody) {
+    togglePestLogsBtn.addEventListener("click", () => {
+        const isHidden = pestLogsDrawerBody.classList.contains("hidden");
+        if (isHidden) {
+            pestLogsDrawerBody.classList.remove("hidden");
+            const icon = togglePestLogsBtn.querySelector(".drawer-toggle-icon");
+            if (icon) icon.classList.add("open");
+            loadPestHistory();
+        } else {
+            pestLogsDrawerBody.classList.add("hidden");
+            const icon = togglePestLogsBtn.querySelector(".drawer-toggle-icon");
+            if (icon) icon.classList.remove("open");
+        }
+    });
+}
+
+async function loadPestHistory() {
+    if (!pestRecentLogsList) return;
+    pestRecentLogsList.innerHTML = `
+        <div class="sa-loading" style="grid-column: 1 / -1; padding: 1rem;">
+            <p>Fetching recent trap scans...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/pest/history`, {
+            headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        const logs = data.logs || [];
+
+        if (logs.length === 0) {
+            pestRecentLogsList.innerHTML = `<p class="empty-logs-text">No previous scans found. Any scan you perform will be saved here.</p>`;
+            return;
+        }
+
+        pestRecentLogsList.innerHTML = "";
+        logs.slice(0, 12).forEach(item => {
+            const date = item.timestamp ? new Date(item.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Recent";
+            const card = document.createElement("div");
+            card.className = "log-mini-card";
+            const isEtl = item.isEtlExceeded || (item.trapCount >= item.economicThreshold);
+            card.innerHTML = `
+                <div class="log-mini-top">
+                    <strong>${item.pestName || "Pest"}</strong>
+                    <span class="log-mini-date">${date}</span>
+                </div>
+                <div class="log-mini-stats">
+                    <span>Trap: <b>${item.trapCount || 0}</b></span>
+                    <span>ETL: <b>${item.economicThreshold || 10}</b></span>
+                    <span style="color: ${isEtl ? '#ef4444' : '#10b981'}; font-weight: bold;">
+                        ${isEtl ? '🚨 Breach' : '🟢 Safe'}
+                    </span>
+                </div>
+            `;
+            pestRecentLogsList.appendChild(card);
+        });
+    } catch (err) {
+        pestRecentLogsList.innerHTML = `<p style="color: var(--danger); font-size: 0.8rem; padding: 0.5rem;">Could not load logs. Server running?</p>`;
+    }
+}

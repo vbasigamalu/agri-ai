@@ -1,7 +1,8 @@
 const { Pool } = require("pg");
+const path = require("path");
 const dotenv = require("dotenv");
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 // Construct Postgres Pool Configuration
 const poolConfig = process.env.DATABASE_URL
@@ -9,7 +10,10 @@ const poolConfig = process.env.DATABASE_URL
         connectionString: process.env.DATABASE_URL,
         ssl: process.env.DATABASE_URL.includes("localhost") || process.env.DATABASE_URL.includes("127.0.0.1")
             ? false
-            : { rejectUnauthorized: false }
+            : { rejectUnauthorized: false },
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000
     }
     : {
         user: process.env.PG_USER || "postgres",
@@ -17,11 +21,24 @@ const poolConfig = process.env.DATABASE_URL
         database: process.env.PG_DATABASE || "agri_ai",
         password: process.env.PG_PASSWORD || "postgres",
         port: parseInt(process.env.PG_PORT || "5432", 10),
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000
     };
 
 const pool = new Pool(poolConfig);
 
 let isPostgresConnected = false;
+
+// CRITICAL: Handle idle client errors so unexpected connection drops never crash Node.js
+pool.on("error", (err) => {
+    // Neon serverless pooler drops idle connections after timeout; this is expected
+    if (err.message && err.message.includes("Connection terminated")) {
+        // Idle connection closed by remote pooler — non-fatal, will reconnect on next query
+        return;
+    }
+    console.warn("⚠️  [PostgreSQL Pool] Connection event:", err.message);
+});
 
 /**
  * Initialize PostgreSQL and ensure essential tables exist
@@ -54,8 +71,8 @@ async function initPostgres() {
         client.release();
     } catch (err) {
         isPostgresConnected = false;
-        console.warn("⚠️  PostgreSQL Connection Warning:", err.message);
-        console.warn("   ℹ️  Please ensure PostgreSQL is running or set valid DATABASE_URL in backend/.env");
+        console.warn("⚠️  PostgreSQL Connection Notice:", err.message);
+        console.warn("   ℹ️  Note: Authentication features require PostgreSQL. All vision/disease/pest features work normally.");
     }
 }
 

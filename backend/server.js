@@ -1,36 +1,78 @@
-const express = require("express");
-const cors = require("cors");
-const multer = require("multer");
-const axios = require("axios");
-const path = require("path");
-const fs = require("fs");
+const path   = require("path");
 const dotenv = require("dotenv");
+const dns    = require("dns");
+
+// Use public DNS to prevent ISP DNS SRV lookup refusal
+try {
+    dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (e) {}
+
+const _dotenvResult = dotenv.config({ path: path.join(__dirname, ".env") });
+if (_dotenvResult.error || !process.env.MONGODB_URI) {
+    console.warn("⚠️  [dotenv] Could not load .env or MONGODB_URI missing. Check backend/.env");
+}
+
+const express  = require("express");
+const cors     = require("cors");
+const multer   = require("multer");
+const axios    = require("axios");
+const fs       = require("fs");
 const mongoose = require("mongoose");
 const { Analysis, ChatSession } = require("./models");
 const { initClassifier, classify, isReady } = require("./classifier");
 const { getDiseaseInfo, searchByKeyword, getSpraySafetyCheck } = require("./cropDatabase");
 const { initPostgres } = require("./postgres");
 const { optionalAuth, authenticateToken } = require("./middleware/auth");
-const authRoutes = require("./routes/auth");
-const pestRoutes = require("./routes/pestRoutes");
+const authRoutes     = require("./routes/auth");
+const pestRoutes     = require("./routes/pestRoutes");
+const forecastRoutes = require("./routes/forecastRoutes");
 
-dotenv.config();
+// MongoDB Connection — non-fatal: server runs even if Atlas is unreachable
+// (common cause: free-tier cluster paused, or IP not whitelisted in Atlas)
+let mongoReady = false;
+global.mongoReady = false;
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log("🍃 MongoDB Connected Successfully"))
-    .catch(err => console.error("❌ MongoDB Connection Error:", err.message));
+function connectMongo(attempt = 1) {
+    if (!process.env.MONGODB_URI) {
+        console.warn("⚠️  MONGODB_URI not set — skipping MongoDB connection");
+        return;
+    }
+    mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 })
+        .then(() => {
+            console.log("🍃 MongoDB Connected Successfully");
+            mongoReady = true;
+            global.mongoReady = true;
+        })
+        .catch(err => {
+            if (attempt === 1) {
+                console.warn(`⚠️  MongoDB Atlas: ${err.message} — Retrying in 10s...`);
+                setTimeout(() => connectMongo(2), 10000);
+            } else {
+                console.warn("   ℹ️  MongoDB Atlas offline/paused. Using PostgreSQL for authentication and local storage for scans. All features work normally.");
+            }
+        });
+}
+connectMongo();
 
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../frontend")));
+
+// Serve modern React UI build if client/dist exists, else fallback to frontend/
+const clientDistPath = path.join(__dirname, "../client/dist");
+if (fs.existsSync(clientDistPath)) {
+    console.log("📦 Serving Modern React App from client/dist");
+    app.use(express.static(clientDistPath));
+} else {
+    app.use(express.static(path.join(__dirname, "../frontend")));
+}
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Mount Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/pest", pestRoutes);
+app.use("/api/forecast", forecastRoutes);
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -299,24 +341,32 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
 
 
 // 2. CHAT ENGINE (Groq API AI)
-app.post("/chat", async (req, res) => {
-    const { question, history, language } = req.body;
+app.post(["/chat", "/api/chat"], async (req, res) => {
+    const question = req.body.question || req.body.message;
+    const { history, language, context } = req.body;
     if (!question) return res.status(400).json({ error: "No question asked" });
 
     try {
         console.log(`\n💬 Chat Query: "${question}"`);
         
         if (!process.env.GROQ_API_KEY) {
-            return res.json({ answer: "⚠️ GROQ_API_KEY is missing in your backend/.env file! Please get a free key from console.groq.com, add it to your .env file, and restart the server." });
+            return res.json({ 
+                answer: "⚠️ GROQ_API_KEY is missing in your backend/.env file! Please get a free key from console.groq.com, add it to your .env file, and restart the server.",
+                reply: "⚠️ GROQ_API_KEY is missing in your backend/.env file! Please get a free key from console.groq.com, add it to your .env file, and restart the server."
+            });
         }
 
         // Build messages array
         let messages = [];
         
         // Add a primary system prompt
+        let sysPrompt = `You are Agri-AI, an expert agricultural assistant. Answer questions clearly and concisely based on your expertise and the provided scan context. Refer to the scan results naturally. IMPORTANT: Never mention that the data is 'hardcoded' or from a 'local database'. Act as if this is your own expert knowledge. Respond in ${language || "English"}.`;
+        if (context) {
+            sysPrompt += ` Current Crop Scan Context: ${context}`;
+        }
         messages.push({
             role: "system",
-            content: `You are Agri-AI, an expert agricultural assistant. Answer questions clearly and concisely based on your expertise and the provided scan context. Refer to the scan results naturally. IMPORTANT: Never mention that the data is 'hardcoded' or from a 'local database'. Act as if this is your own expert knowledge. Respond in ${language || "English"}.`
+            content: sysPrompt
         });
 
         // Add history from frontend — trim to last 10 messages (5 exchanges) to avoid token overflow
@@ -348,11 +398,11 @@ app.post("/chat", async (req, res) => {
         let aiAnswer = response.data.choices[0].message.content || "";
         // Clean out any internal <think> tags if model produces reasoning tokens
         aiAnswer = aiAnswer.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-        return res.json({ answer: aiAnswer });
+        return res.json({ answer: aiAnswer, reply: aiAnswer });
 
     } catch (err) { 
         console.error("Chat Error:", err.response ? err.response.data : err.message);
-        res.status(500).json({ error: "Brain error", answer: "Oops, my AI brain had a hiccup. Check the API key and internet connection." }); 
+        res.status(500).json({ error: "Brain error", answer: "Oops, my AI brain had a hiccup. Check the API key and internet connection.", reply: "Oops, my AI brain had a hiccup. Check the API key and internet connection." }); 
     }
 });
 
@@ -377,19 +427,29 @@ app.get("/api/geocode", async (req, res) => {
     } catch (err) { res.json({ address: `📍 [${parseFloat(lat).toFixed(2)}, ${parseFloat(lon).toFixed(2)}]` }); }
 });
 
-// 4. SCAN HISTORY (MongoDB Powered)
-app.get("/history", optionalAuth, async (req, res) => {
+// 4. SCAN HISTORY (MongoDB Powered + Graceful fallback)
+app.get(["/history", "/api/history"], optionalAuth, async (req, res) => {
     try {
+        if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+            return res.json([]);
+        }
         const queryFilter = req.user ? { userId: req.user.id.toString() } : {};
-        const history = await Analysis.find(queryFilter).sort({ timestamp: -1 }).limit(25);
-        res.json(history);
+        const history = await Analysis.find(queryFilter).sort({ timestamp: -1 }).limit(30);
+        res.json(history || []);
     } catch (err) {
-        console.error("HISTORY ERROR:", err);
-        res.status(500).json({ error: "Could not fetch history." });
+        console.error("HISTORY ERROR:", err.message);
+        res.json([]);
     }
 });
 
 
+
+// SPA Client Fallback for client/dist
+if (fs.existsSync(clientDistPath)) {
+    app.get(/^(?!\/(api|analyze|chat|history|status|uploads)).*$/, (req, res) => {
+        res.sendFile(path.join(clientDistPath, "index.html"));
+    });
+}
 
 // ═══════════════════════════════════════════════
 //  START SERVER
@@ -406,6 +466,16 @@ if (require.main === module) {
 
         // Initialize TensorFlow.js Classifier
         initClassifier().catch(err => console.error("   ❌ Initializer Failed:", err.message));
+    });
+
+    serverInstance.on("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+            console.error(`\n❌ [PORT IN USE] Port ${PORT} is already in use by another running Agri-AI process.`);
+            console.log(`   💡 Tip: Close the existing terminal window running Agri-AI, or run: npx kill-port ${PORT}\n`);
+            process.exit(1);
+        } else {
+            console.error("❌ Server startup error:", err.message);
+        }
     });
 }
 

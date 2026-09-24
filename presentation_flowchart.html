@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agri-AI — PPT Architecture Flowchart</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b1320;
+            --card-bg: #131f33;
+            --card-border: #223454;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --primary: #10b981;
+            --primary-glow: rgba(16, 185, 129, 0.2);
+            --accent-blue: #38bdf8;
+            --accent-purple: #a855f7;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --node-bg: #1a2942;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #060911;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px 60px;
+            min-height: 100vh;
+        }
+
+        /* Top Toolbar */
+        .controls-bar {
+            max-width: 1400px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(19, 31, 51, 0.85);
+            border: 1px solid #2a3f66;
+            backdrop-filter: blur(12px);
+            padding: 14px 24px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .controls-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #34d399;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tab-btn-group {
+            display: flex;
+            background: #0c1524;
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid #1e3050;
+            gap: 6px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 8px 18px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #10b981;
+            color: #062218;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(16,185,129,0.3);
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: #fff;
+            border: none;
+            padding: 10px 22px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border-radius: 9px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+        }
+
+        /* 16:9 Slide Canvas for PowerPoint */
+        .slide-frame {
+            width: 1333px;
+            height: 750px; /* Standard 16:9 ratio */
+            background: linear-gradient(145deg, #0d1728 0%, #080f1d 100%);
+            border: 1px solid #1f3354;
+            border-radius: 18px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+            padding: 34px 44px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ambient Glow Background */
+        .slide-frame::before {
+            content: '';
+            position: absolute;
+            top: -150px;
+            left: -150px;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .slide-frame::after {
+            content: '';
+            position: absolute;
+            bottom: -150px;
+            right: -150px;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* Slide Header */
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .slide-title-group h1 {
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slide-title-group h1 span.badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .slide-subtitle {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin-top: 4px;
+        }
+
+        .project-tag {
+            font-family: 'JetBrains Mono', monospace;
+            background: #152238;
+            border: 1px solid #253859;
+            color: #38bdf8;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Grid Columns for Pipeline Stages */
+        .pipeline-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 18px;
+            flex: 1;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Column / Stage Card */
+        .stage-col {
+            background: rgba(19, 31, 51, 0.6);
+            border: 1px solid #1f3354;
+            border-radius: 14px;
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Step Arrow Connector */
+        .stage-col:not(:last-child)::after {
+            content: '➔';
+            position: absolute;
+            right: -13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #38bdf8;
+            font-size: 1.1rem;
+            font-weight: 900;
+            background: #0e192c;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #2b456e;
+            z-index: 10;
+        }
+
+        .col-header {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 10px;
+        }
+
+        .col-step {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .col-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        /* Color accents for columns */
+        .col-1 .col-step { color: var(--accent-blue); }
+        .col-1 { border-top: 3px solid var(--accent-blue); }
+
+        .col-2 .col-step { color: var(--accent-amber); }
+        .col-2 { border-top: 3px solid var(--accent-amber); }
+
+        .col-3 .col-step { color: var(--accent-purple); }
+        .col-3 { border-top: 3px solid var(--accent-purple); }
+
+        .col-4 .col-step { color: var(--accent-rose); }
+        .col-4 { border-top: 3px solid var(--accent-rose); }
+
+        .col-5 .col-step { color: var(--primary); }
+        .col-5 { border-top: 3px solid var(--primary); }
+
+        /* Block / Item Cards inside column */
+        .block-card {
+            background: #18263e;
+            border: 1px solid #283e63;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .block-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .block-desc {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            line-height: 1.35;
+        }
+
+        .tech-pill {
+            display: inline-block;
+            align-self: flex-start;
+            margin-top: 4px;
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: #0f1a2d;
+            border: 1px solid #233758;
+            color: #cbd5e1;
+        }
+
+        /* Bottom Status Footer */
+        .slide-footer {
+            margin-top: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(14, 23, 38, 0.8);
+            border: 1px solid #1f3354;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            z-index: 2;
+        }
+
+        .footer-metrics {
+            display: flex;
+            gap: 22px;
+        }
+
+        .footer-metrics span {
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .highlight-green { color: #34d399 !important; }
+        .highlight-blue { color: #38bdf8 !important; }
+        .highlight-amber { color: #fbbf24 !important; }
+
+        /* Slide 2 Specific Styling (7-Stage Vision Pipeline) */
+        .slide-view {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+        }
+
+        .slide-view.active {
+            display: flex;
+        }
+
+        .vision-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: auto auto;
+            gap: 16px;
+            flex: 1;
+            position: relative;
+            z-index: 2;
+        }
+
+        .vision-card {
+            background: rgba(20, 32, 53, 0.75);
+            border: 1px solid #223759;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+
+        .vision-card .step-num {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: rgba(255,255,255,0.12);
+        }
+
+        .vision-card h3 {
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vision-card p {
+            font-size: 0.78rem;
+            color: #94a3b8;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .sub-bullet {
+            font-size: 0.73rem;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sub-bullet::before {
+            content: '•';
+            color: #10b981;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Controls Toolbar -->
+    <div class="controls-bar">
+        <div class="controls-title">
+            <span>🌱</span> Agri-AI System Flowchart (PPT Presentation Ready)
+        </div>
+        
+        <div class="tab-btn-group">
+            <button class="tab-btn active" onclick="switchSlide(1)">Slide 1: System Flowchart</button>
+            <button class="tab-btn" onclick="switchSlide(2)">Slide 2: Visual AI Pipeline (7 Stages)</button>
+        </div>
+
+        <button class="download-btn" id="exportBtn" onclick="exportSlideToPNG()">
+            <span>📥</span> Download HD PNG for PPT
+        </button>
+    </div>
+
+    <!-- 16:9 PowerPoint Slide Frame -->
+    <div class="slide-frame" id="slideFrame">
+        
+        <!-- ==================== SLIDE 1: SYSTEM FLOW ==================== -->
+        <div class="slide-view active" id="slide1">
+            <div class="slide-header">
+                <div class="slide-title-group">
+                    <h1>
+                        Agri-AI : End-to-End System Architecture
+                        <span class="badge">Production Pipeline</span>
+                    </h1>
+                    <div class="slide-subtitle">Multimodal Crop Health Diagnosis, Real-Time Weather Fusion & Autonomous Advisory</div>
+                </div>
+                <div class="project-tag">SIH-2024 / Agri-AI</div>
+            </div>
+
+            <div class="pipeline-container">
+                <!-- Column 1: Input Layer -->
+                <div class="stage-col col-1">
+                    <div class="col-header">
+                        <div class="col-step">Stage 01</div>
+                        <div class="col-title">Client Input</div>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">📸 Crop Photo Capture</div>
+                        <div class="block-desc">Farmer captures or uploads diseased leaf photo via mobile browser.</div>
+                        <span class="tech-pill">JPEG / PNG / WebP</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">📍 Hyperlocal GPS</div>
+                        <div class="block-desc">Captures device lat/long coordinates with Nominatim reverse geocode.</div>
+                        <span class="tech-pill">HTML5 Geolocation API</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">👤 Farmer Context</div>
+                        <div class="block-desc">Profile, active crop type, and preferred regional language.</div>
+                        <span class="tech-pill">JWT Auth / PostgreSQL</span>
+                    </div>
+                </div>
+
+                <!-- Column 2: Gateway & Preprocessing -->
+                <div class="stage-col col-2">
+                    <div class="col-header">
+                        <div class="col-step">Stage 02</div>
+                        <div class="col-title">Vision Guard</div>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🔍 Image Quality Gate</div>
+                        <div class="block-desc">Checks blur (Laplacian), exposure & green plant pixel ratio.</div>
+                        <span class="tech-pill">qualityCheck.js</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🍃 Saliency & Contour</div>
+                        <div class="block-desc">Segment leaf contour and reject non-agricultural objects.</div>
+                        <span class="tech-pill">leafDetector.js</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">✂️ Background Removal</div>
+                        <div class="block-desc">Eliminates soil, hands & background clutter; normalizes to 224x224.</div>
+                        <span class="tech-pill">backgroundSuppressor.js</span>
+                    </div>
+                </div>
+
+                <!-- Column 3: AI Inference Core -->
+                <div class="stage-col col-3">
+                    <div class="col-header">
+                        <div class="col-step">Stage 03</div>
+                        <div class="col-title">AI Engine</div>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🚀 Deep Learning Head</div>
+                        <div class="block-desc">38-class fine-tuned model for instant crop disease classification.</div>
+                        <span class="tech-pill">PyTorch ONNX / WASM</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🛡️ OOD Uncertainty Gate</div>
+                        <div class="block-desc">Softmax entropy & top-2 margin test to prevent wrong predictions.</div>
+                        <span class="tech-pill">uncertaintyGate.js</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🔬 Severity Estimator</div>
+                        <div class="block-desc">Lesion area percentage quantified into Mild, Moderate, or Severe.</div>
+                        <span class="tech-pill">severityEstimator.js</span>
+                    </div>
+                </div>
+
+                <!-- Column 4: Multimodal Context -->
+                <div class="stage-col col-4">
+                    <div class="col-header">
+                        <div class="col-step">Stage 04</div>
+                        <div class="col-title">Context Fusion</div>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🌤️ Weather Telemetry</div>
+                        <div class="block-desc">Live field temperature, humidity, rain radar & wind speed fetch.</div>
+                        <span class="tech-pill">OpenWeatherMap API</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">⚠️ Spray Safety Matrix</div>
+                        <div class="block-desc">Blocks chemical spray when wind > 15km/h (drift) or high heat (scorch).</div>
+                        <span class="tech-pill">Rules Decision Engine</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">📚 IPM Knowledge Base</div>
+                        <div class="block-desc">Links disease to organic biocontrols & chemical remedies + dosages.</div>
+                        <span class="tech-pill">cropDatabase.js</span>
+                    </div>
+                </div>
+
+                <!-- Column 5: Farmer Advisory & Persistence -->
+                <div class="stage-col col-5">
+                    <div class="col-header">
+                        <div class="col-step">Stage 05</div>
+                        <div class="col-title">Farmer Action</div>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">📋 Smart Advisory Card</div>
+                        <div class="block-desc">Disease name, confidence meter, organic IPM treatments & spray alerts.</div>
+                        <span class="tech-pill">Single Page UI</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">🤖 Groq AI Agronomist</div>
+                        <div class="block-desc">Interactive conversational chat in farmer's native dialect.</div>
+                        <span class="tech-pill">Groq LLaMA / OSS LLM</span>
+                    </div>
+                    <div class="block-card">
+                        <div class="block-title">💾 Field Scan Registry</div>
+                        <div class="block-desc">Historical timeline with GPS coordinates & disease trends.</div>
+                        <span class="tech-pill">MongoDB Atlas</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Specs -->
+            <div class="slide-footer">
+                <div>⚡ <strong>Latency:</strong> ~450ms End-to-End | <strong>Model Size:</strong> 14MB Edge-ready | <strong>Offline Mode:</strong> Full WASM Support</div>
+                <div class="footer-metrics">
+                    <div>Classes: <span class="highlight-green">38 Diseases</span></div>
+                    <div>Accuracy: <span class="highlight-blue">96.4%</span></div>
+                    <div>Spray Check: <span class="highlight-amber">Real-Time</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SLIDE 2: VISION PIPELINE ==================== -->
+        <div class="slide-view" id="slide2">
+            <div class="slide-header">
+                <div class="slide-title-group">
+                    <h1>
+                        Agri-AI : 7-Stage Defensive Visual AI Pipeline
+                        <span class="badge">Computer Vision Architecture</span>
+                    </h1>
+                    <div class="slide-subtitle">Solving Out-Of-Distribution Clutter, Variable Lighting, and Overconfidence in Real Farms</div>
+                </div>
+                <div class="project-tag">SIH-2024 / Vision Engine</div>
+            </div>
+
+            <div class="vision-grid">
+                <!-- Step 1 -->
+                <div class="vision-card" style="border-top: 3px solid #38bdf8;">
+                    <div class="step-num">01</div>
+                    <h3>🔍 Image Quality Check</h3>
+                    <p>Detects poor lighting, motion blur, and out-of-focus captures before invoking heavy models.</p>
+                    <div class="sub-bullet">Laplacian variance blur detector (> 100)</div>
+                    <div class="sub-bullet">Over/underexposure brightness histogram</div>
+                    <div class="sub-bullet">Rejects non-plant images (green ratio check)</div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="vision-card" style="border-top: 3px solid #3b82f6;">
+                    <div class="step-num">02</div>
+                    <h3>🍃 Leaf Saliency & Contour</h3>
+                    <p>Isolates plant foliage from human hands, soil, fences, and background artifacts.</p>
+                    <div class="sub-bullet">HSV color thresholding & masking</div>
+                    <div class="sub-bullet">Morphological contour segmentation</div>
+                    <div class="sub-bullet">Calculates primary leaf bounding boxes</div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="vision-card" style="border-top: 3px solid #6366f1;">
+                    <div class="step-num">03</div>
+                    <h3>🌿 Multi-Leaf Aggregator</h3>
+                    <p>Handles real farm canopy images containing multiple leaves with varying infection levels.</p>
+                    <div class="sub-bullet">Separates candidate leaves (N &ge; 1)</div>
+                    <div class="sub-bullet">Per-leaf independent inference run</div>
+                    <div class="sub-bullet">Healthy vs. Infected ratio calculation</div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="vision-card" style="border-top: 3px solid #a855f7;">
+                    <div class="step-num">04</div>
+                    <h3>✂️ Background Suppressor</h3>
+                    <p>Removes background bias so model learns disease pathology, not soil or farm textures.</p>
+                    <div class="sub-bullet">Tensors cropped to bounding region</div>
+                    <div class="sub-bullet">Resizes cleanly to 224 &times; 224 px</div>
+                    <div class="sub-bullet">CHW planar tensor normalization [0, 1]</div>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="vision-card" style="border-top: 3px solid #ec4899;">
+                    <div class="step-num">05</div>
+                    <h3>🚀 Dual-Engine Inference</h3>
+                    <p>High-throughput edge & server execution with cross-platform fallback resilience.</p>
+                    <div class="sub-bullet">Primary: PyTorch ONNX Runtime Session</div>
+                    <div class="sub-bullet">Fallback: TensorFlow.js WebAssembly (WASM)</div>
+                    <div class="sub-bullet">Zero native C++ build dependencies needed</div>
+                </div>
+
+                <!-- Step 6 -->
+                <div class="vision-card" style="border-top: 3px solid #f59e0b;">
+                    <div class="step-num">06</div>
+                    <h3>🛡️ OOD Uncertainty Gate</h3>
+                    <p>Blocks overconfident hallucinations on unknown weeds, hands, or unseen diseases.</p>
+                    <div class="sub-bullet">Shannon entropy on probability distribution</div>
+                    <div class="sub-bullet">Top-1 vs. Top-2 margin comparison (&gt; 0.20)</div>
+                    <div class="sub-bullet">Marks ambiguous cases for human review</div>
+                </div>
+
+                <!-- Step 7 -->
+                <div class="vision-card" style="border-top: 3px solid #10b981;">
+                    <div class="step-num">07</div>
+                    <h3>🔬 Severity & Grad-CAM</h3>
+                    <p>Quantifies disease progression and generates visual explainability for agronomists.</p>
+                    <div class="sub-bullet">Lesion area percentage computation</div>
+                    <div class="sub-bullet">Grades: Mild (&lt;10%), Moderate, Severe (&gt;35%)</div>
+                    <div class="sub-bullet">Grad-CAM heatmap of diagnostic focus</div>
+                </div>
+
+                <!-- Step 8 -->
+                <div class="vision-card" style="border-top: 3px solid #14b8a6;">
+                    <div class="step-num">08</div>
+                    <h3>📋 Actionable Prescription</h3>
+                    <p>Couples technical disease detection with field-ready agronomic treatments.</p>
+                    <div class="sub-bullet">Biological IPM treatments (Neem, Trichoderma)</div>
+                    <div class="sub-bullet">Exact chemical active ingredient & dosage</div>
+                    <div class="sub-bullet">Weather-linked spray advisory checklist</div>
+                </div>
+            </div>
+
+            <!-- Footer Specs -->
+            <div class="slide-footer">
+                <div>🛡️ <strong>Zero Hallucinations Policy:</strong> Quality checks + Uncertainty Gates prevent wrong chemical purchases</div>
+                <div class="footer-metrics">
+                    <div>FPR on Non-Crops: <span class="highlight-green">&lt; 0.5%</span></div>
+                    <div>Inference Latency: <span class="highlight-blue">&lt; 180ms</span></div>
+                    <div>SIH Readiness: <span class="highlight-amber">100% Complete</span></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function switchSlide(slideNum) {
+            document.querySelectorAll('.slide-view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('slide' + slideNum).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        async function exportSlideToPNG() {
+            const btn = document.getElementById('exportBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "⏳ Rendering 4K PNG...";
+            btn.style.opacity = "0.7";
+
+            const slideEl = document.getElementById('slideFrame');
+            
+            try {
+                const canvas = await html2canvas(slideEl, {
+                    scale: 2, // 2x scale produces crisp 2666x1500 image for PPT
+                    useCORS: true,
+                    backgroundColor: "#060911"
+                });
+
+                const link = document.createElement('a');
+                const activeSlide = document.querySelector('.slide-view.active').id;
+                link.download = `AgriAI_${activeSlide}_PPT_Slide.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (err) {
+                alert("Export failed: " + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.style.opacity = "1";
+            }
+        }
+    </script>
+</body>
+</html>

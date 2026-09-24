@@ -1,0 +1,21 @@
+{
+  "feature_names": [
+    "temp_c",
+    "humidity_pct",
+    "rainfall_mm",
+    "wind_kmh",
+    "dew_spread",
+    "stage_enc",
+    "disease_hist_score",
+    "pest_etl_ratio",
+    "prev_disease_risk",
+    "prev_pest_risk",
+    "rainfall_x_humidity",
+    "temp_humidity_diff",
+    "is_humid_warm",
+    "is_hot_dry"
+  ],
+  "n_features": 14,
+  "trained_on": 12000,
+  "engine": "xgboost-phase2"
+}

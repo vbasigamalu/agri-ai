@@ -33,9 +33,17 @@ if not exist "node_modules\" (
         pause
         exit /b 1
     )
+    echo [SUCCESS] Backend dependencies installed!
     echo.
-    echo [SUCCESS] Dependencies installed successfully!
-    echo.
+)
+
+:: Check if client is built, build if missing
+if not exist "%~dp0client\dist\" (
+    echo [INFO] Building modern React frontend...
+    cd /d "%~dp0client"
+    if not exist "node_modules\" call npm install
+    call npm run build
+    cd /d "%~dp0backend"
 )
 
 :: Automatically open default browser to Agri-AI web app in 3 seconds

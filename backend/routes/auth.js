@@ -24,18 +24,32 @@ router.post("/register", async (req, res) => {
             preferred_language = "mr"
         } = req.body;
 
+        const rawIdentifier = (phone_or_email || req.body.identifier || req.body.email || req.body.phone || "").toString().trim();
+
         // 1. Validation
-        if (!name || !name.trim()) {
-            return res.status(400).json({ error: "Name is required (नाव आवश्यक आहे)." });
+        if (!name || !name.toString().trim()) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Name is required (नाव आवश्यक आहे).", 
+                message: "Name is required (नाव आवश्यक आहे)." 
+            });
         }
-        if (!phone_or_email || !phone_or_email.trim()) {
-            return res.status(400).json({ error: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल आवश्यक आहे)." });
+        if (!rawIdentifier) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल आवश्यक आहे).", 
+                message: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल आवश्यक आहे)." 
+            });
         }
         if (!password || password.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters (पासवर्ड किमान ६ अक्षरांचा असावा)." });
+            return res.status(400).json({ 
+                success: false, 
+                error: "Password must be at least 6 characters (पासवर्ड किमान ६ अक्षरांचा असावा).", 
+                message: "Password must be at least 6 characters (पासवर्ड किमान ६ अक्षरांचा असावा)." 
+            });
         }
 
-        const cleanIdentifier = phone_or_email.trim().toLowerCase();
+        const cleanIdentifier = rawIdentifier.toLowerCase();
 
         // Password Hashing using bcrypt
         const salt = await bcrypt.genSalt(10);
@@ -52,7 +66,9 @@ router.post("/register", async (req, res) => {
 
             if (existingUserRes.rows.length > 0) {
                 return res.status(409).json({
-                    error: "User with this Phone/Email already exists. Please login instead. (या नंबर/ईमेलसह खाते आधीच उपलब्ध आहे. कृपया लॉगिन करा.)"
+                    success: false,
+                    error: "User with this Phone/Email already exists. Please login instead. (या नंबर/ईमेलसह खाते आधीच उपलब्ध आहे. कृपया लॉगिन करा.)",
+                    message: "User with this Phone/Email already exists. Please login instead. (या नंबर/ईमेलसह खाते आधीच उपलब्ध आहे. कृपया लॉगिन करा.)"
                 });
             }
 
@@ -62,33 +78,44 @@ router.post("/register", async (req, res) => {
                 RETURNING id, name, phone_or_email, role, state, district, village, preferred_language, created_at;
             `;
             const newUserRes = await query(insertQuery, [
-                name.trim(),
+                name.toString().trim(),
                 cleanIdentifier,
                 password_hash,
-                role,
-                state.trim(),
-                district.trim(),
-                village.trim(),
-                preferred_language
+                role || "farmer",
+                (state || "Maharashtra").toString().trim(),
+                (district || "").toString().trim(),
+                (village || "").toString().trim(),
+                preferred_language || "mr"
             ]);
             user = newUserRes.rows[0];
 
         } catch (dbErr) {
-            console.warn("⚠️ PostgreSQL offline, saving user to local store fallback:", dbErr.message);
+            if (dbErr.code === "23505" || (dbErr.message && dbErr.message.includes("unique constraint"))) {
+                return res.status(409).json({
+                    success: false,
+                    error: "User with this Phone/Email already exists. Please login instead.",
+                    message: "User with this Phone/Email already exists. Please login instead."
+                });
+            }
+            console.warn("⚠️ PostgreSQL offline or error, saving user to local store fallback:", dbErr.message);
             // Fallback to local file store
             try {
                 user = localStore.createUser({
-                    name,
+                    name: name.toString().trim(),
                     phone_or_email: cleanIdentifier,
                     password_hash,
-                    role,
-                    state,
-                    district,
-                    village,
-                    preferred_language
+                    role: role || "farmer",
+                    state: state || "Maharashtra",
+                    district: district || "",
+                    village: village || "",
+                    preferred_language: preferred_language || "mr"
                 });
             } catch (localErr) {
-                return res.status(409).json({ error: localErr.message });
+                return res.status(409).json({ 
+                    success: false, 
+                    error: localErr.message, 
+                    message: localErr.message 
+                });
             }
         }
 
@@ -107,15 +134,23 @@ router.post("/register", async (req, res) => {
 
         console.log(`👤 New Farmer Registered: [${user.name}] (${user.phone_or_email}) - Role: ${user.role}`);
 
+        const safeUser = { ...user };
+        delete safeUser.password_hash;
+
         res.status(201).json({
+            success: true,
             message: "Registration successful! (नोंदणी यशस्वी झाली!)",
             token,
-            user
+            user: safeUser
         });
 
     } catch (err) {
         console.error("Registration Error:", err);
-        res.status(500).json({ error: err.message || "Failed to register user." });
+        res.status(500).json({ 
+            success: false, 
+            error: err.message || "Failed to register user.", 
+            message: err.message || "Failed to register user." 
+        });
     }
 });
 
@@ -126,16 +161,25 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
     try {
         const { phone_or_email, password } = req.body;
+        const rawIdentifier = (phone_or_email || req.body.identifier || req.body.email || req.body.phone || "").toString().trim();
 
         // 1. Validation
-        if (!phone_or_email || !phone_or_email.trim()) {
-            return res.status(400).json({ error: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल प्रविष्ट करा)." });
+        if (!rawIdentifier) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल प्रविष्ट करा).", 
+                message: "Phone number or Email is required (मोबाईल नंबर किंवा ईमेल प्रविष्ट करा)." 
+            });
         }
         if (!password) {
-            return res.status(400).json({ error: "Password is required (पासवर्ड प्रविष्ट करा)." });
+            return res.status(400).json({ 
+                success: false, 
+                error: "Password is required (पासवर्ड प्रविष्ट करा).", 
+                message: "Password is required (पासवर्ड प्रविष्ट करा)." 
+            });
         }
 
-        const cleanIdentifier = phone_or_email.trim().toLowerCase();
+        const cleanIdentifier = rawIdentifier.toLowerCase();
         let user = null;
 
         // Try PostgreSQL first
@@ -159,7 +203,9 @@ router.post("/login", async (req, res) => {
 
         if (!user) {
             return res.status(401).json({
-                error: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)"
+                success: false,
+                error: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)",
+                message: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)"
             });
         }
 
@@ -167,7 +213,9 @@ router.post("/login", async (req, res) => {
         const isPasswordMatch = await bcrypt.compare(password, user.password_hash);
         if (!isPasswordMatch) {
             return res.status(401).json({
-                error: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)"
+                success: false,
+                error: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)",
+                message: "Invalid Phone/Email or Password. (चुकीचा मोबाईल/ईमेल किंवा पासवर्ड.)"
             });
         }
 
@@ -191,6 +239,7 @@ router.post("/login", async (req, res) => {
         console.log(`🔐 Farmer Logged In: [${user.name}] (${user.phone_or_email})`);
 
         res.json({
+            success: true,
             message: "Login successful! (लॉगिन यशस्वी झाले!)",
             token,
             user: safeUser
@@ -198,7 +247,11 @@ router.post("/login", async (req, res) => {
 
     } catch (err) {
         console.error("Login Error:", err);
-        res.status(500).json({ error: err.message || "Failed to log in." });
+        res.status(500).json({ 
+            success: false, 
+            error: err.message || "Failed to log in.", 
+            message: err.message || "Failed to log in." 
+        });
     }
 });
 

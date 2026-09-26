@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { LeafIcon, UserIcon } from "./Icons";
+import { LeafIcon, UserIcon, ArrowLeftIcon } from "./Icons";
 
 const API = "";
 
-export default function AuthPage({ onLogin }) {
+export default function AuthPage({ onLogin, onBackToLanding }) {
   const [tab, setTab] = useState("login");
   const [form, setForm] = useState({
     identifier: "", password: "", name: "", district: "", village: "", role: "farmer"
@@ -113,6 +113,44 @@ export default function AuthPage({ onLogin }) {
 
   return (
     <div className="auth-page">
+      {onBackToLanding && (
+        <div style={{
+          width: "100%",
+          maxWidth: "420px",
+          margin: "0 auto 1rem auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between"
+        }}>
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            id="auth-go-back-top"
+            title="Go Back to Landing Page"
+            aria-label="Go Back to Landing Page"
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              background: "#ffffff",
+              border: "1.5px solid #166534",
+              color: "#166534",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <ArrowLeftIcon size={20} color="#166534" />
+          </button>
+          <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>
+            Agri-AI Platform
+          </span>
+        </div>
+      )}
+
       <div className="auth-card">
         <div className="auth-logo">
           <span className="logo-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>

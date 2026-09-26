@@ -7,6 +7,7 @@ import ForecastTab    from "./components/ForecastTab";
 import HistoryTab     from "./components/HistoryTab";
 import OutbreakMapTab from "./components/OutbreakMapTab";
 import ExpertTab      from "./components/ExpertTab";
+import LandingPage    from "./components/landing/LandingPage";
 import {
   LeafIcon,
   MapIcon,
@@ -21,7 +22,8 @@ import {
   CloseIcon,
   BellIcon,
   FlaskIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  HomeIcon
 } from "./components/Icons";
 
 const NAV_ITEMS = [
@@ -35,21 +37,20 @@ const NAV_ITEMS = [
 ];
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [tab, setTab] = useState("disease");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Check saved session on mount
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem("agri_user");
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
+      return savedUser ? JSON.parse(savedUser) : null;
     } catch (e) {
-      console.warn("Could not parse saved user:", e);
+      return null;
     }
-  }, []);
+  });
+  const [tab, setTab] = useState("disease");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Always start on landing page — session is restored silently so no re-login needed
+  const [currentView, setCurrentView] = useState("landing");
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [targetTabAfterLogin, setTargetTabAfterLogin] = useState("disease");
 
   const [lastScanLocation, setLastScanLocation] = useState(() => {
     try {
@@ -114,9 +115,119 @@ export default function App() {
     localStorage.removeItem("agri_token");
     localStorage.removeItem("agri_user");
     setUser(null);
+    setShowLoginModal(false);
+    setCurrentView("landing");
   }
 
-  if (!user) return <AuthPage onLogin={handleLogin} />;
+  function handleGuestLogin() {
+    const guestUser = { 
+      name: "Guest Farmer", 
+      location: "Maharashtra", 
+      district: "Maharashtra", 
+      village: "", 
+      role: "farmer", 
+      token: null, 
+      guest: true 
+    };
+    try {
+      localStorage.setItem("agri_user", JSON.stringify(guestUser));
+    } catch (e) {
+      console.warn("Could not save guest session:", e);
+    }
+    setUser(guestUser);
+    return guestUser;
+  }
+
+  function handleOpenLogin(target = "disease") {
+    setTargetTabAfterLogin(target);
+    setShowLoginModal(true);
+  }
+
+  function handleAnalyzeCrop() {
+    if (!user || user.guest) {
+      handleOpenLogin("disease");
+      return;
+    }
+    setTab("disease");
+    setCurrentView("app");
+  }
+
+  function handleGoToApp(destTab = "disease") {
+    const tabMap = {
+      detect: "disease",
+      disease: "disease",
+      map: "map",
+      hotspots: "map",
+      pest: "pest",
+      followup: "followup",
+      forecast: "forecast",
+      expert: "expert",
+      history: "history",
+      dashboard: "disease"
+    };
+    const target = tabMap[destTab] || "disease";
+    if (!user || user.guest) {
+      handleOpenLogin(target);
+      return;
+    }
+    setTab(target);
+    setCurrentView("app");
+  }
+
+  // 1. Landing Page View (with interactive Login Option Modal)
+  if (currentView === "landing") {
+    return (
+      <>
+        <LandingPage
+          user={user}
+          onLogin={() => handleOpenLogin("disease")}
+          onGetStarted={() => handleGoToApp("disease")}
+          onAnalyzeCrop={handleAnalyzeCrop}
+          onGoToApp={handleGoToApp}
+        />
+
+        {/* Modal Overlay for Login Option directly on Landing Page */}
+        {showLoginModal && (
+          <div
+            className="auth-modal-backdrop"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowLoginModal(false);
+              }
+            }}
+          >
+            <AuthPage
+              onLogin={(u) => {
+                handleLogin(u);
+                setShowLoginModal(false);
+                setTab(targetTabAfterLogin || "disease");
+                setCurrentView("app");
+              }}
+              onBackToLanding={() => setShowLoginModal(false)}
+            />
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // 2. Authentication View (Dedicated Page)
+  if (currentView === "auth" || (!user && currentView === "app")) {
+    return (
+      <AuthPage
+        onLogin={(u) => {
+          handleLogin(u);
+          setShowLoginModal(false);
+          setTab(targetTabAfterLogin || "disease");
+          setCurrentView("app");
+        }}
+        onBackToLanding={() => {
+          setShowLoginModal(false);
+          setCurrentView("landing");
+        }}
+      />
+    );
+  }
 
   const activeItem = NAV_ITEMS.find((n) => n.id === tab) || NAV_ITEMS[0];
   const ActiveIcon = activeItem.Icon;
@@ -158,6 +269,28 @@ export default function App() {
 
         {/* Navigation Items */}
         <nav className="sidebar-nav">
+          <div style={{ marginBottom: "0.65rem" }}>
+            <button
+              id="nav-landing-home"
+              className="sidebar-link"
+              onClick={() => {
+                setCurrentView("landing");
+                setMobileMenuOpen(false);
+              }}
+              style={{
+                background: "rgba(22, 163, 74, 0.1)",
+                borderColor: "rgba(22, 163, 74, 0.3)",
+                color: "#166534",
+                fontWeight: 700
+              }}
+            >
+              <span className="nav-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+                <HomeIcon size={18} color="#166534" />
+              </span>
+              <span>Home / Landing Page</span>
+            </button>
+          </div>
+
           <div className="sidebar-heading">Navigation Menu</div>
           {NAV_ITEMS.map((item) => {
             const isActive = tab === item.id;
@@ -241,6 +374,7 @@ export default function App() {
           </div>
 
           <div className="header-right" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+
             {/* ML Scientific Benchmark Button */}
             <button
               onClick={handleOpenMlModal}

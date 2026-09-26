@@ -77,7 +77,3 @@ echo.
 echo [INFO] Opening default browser in 3 seconds...
 start "" powershell -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:5173'"
 
-echo.
-echo Press any key to exit this launcher window.
-echo (The Backend and Frontend windows will stay running).
-pause >nul

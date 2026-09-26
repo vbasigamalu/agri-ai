@@ -13,9 +13,30 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  function loginOffline() {
+    const enteredId = form.identifier.trim();
+    const fallbackName = form.name.trim() || (enteredId.includes("@") ? enteredId.split("@")[0] : enteredId) || "Farmer";
+    const offlineUser = {
+      id: "offline_" + Date.now(),
+      name: fallbackName,
+      phone_or_email: enteredId || "farmer@agri-ai.local",
+      location: form.district || "Maharashtra",
+      district: form.district || "Maharashtra",
+      village: form.village || "",
+      role: form.role || "farmer",
+      token: "offline_demo_token_" + Date.now(),
+      isOffline: true
+    };
+    localStorage.setItem("agri_token", offlineUser.token);
+    localStorage.setItem("agri_ai_token", offlineUser.token);
+    localStorage.setItem("agri_user", JSON.stringify(offlineUser));
+    localStorage.setItem("agri_ai_user", JSON.stringify(offlineUser));
+    onLogin(offlineUser);
+  }
+
   async function handleLogin(e) {
     e.preventDefault();
-    setLoading(true); setMsg({ text: "", type: "" });
+    setLoading(true); setMsg({ text: "", type: "", allowOffline: false });
     try {
       const r = await fetch(`${API}/api/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -25,7 +46,14 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
           password: form.password 
         })
       });
-      const d = await r.json();
+
+      let d = {};
+      try {
+        d = await r.json();
+      } catch {
+        d = {};
+      }
+
       if (r.ok && (d.token || d.success)) {
         localStorage.setItem("agri_token", d.token);
         localStorage.setItem("agri_ai_token", d.token);
@@ -42,17 +70,27 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
         localStorage.setItem("agri_user", JSON.stringify(userData));
         localStorage.setItem("agri_ai_user", JSON.stringify(d.user || userData));
         onLogin(userData);
+      } else if (r.status === 404) {
+        setMsg({ 
+          text: "Backend API endpoint not found (404). The deployed server may be outdated or still syncing. You can continue immediately in Offline Mode:", 
+          type: "error",
+          allowOffline: true 
+        });
       } else {
         setMsg({ text: d.error || d.message || "Invalid Phone/Email or Password.", type: "error" });
       }
     } catch {
-      setMsg({ text: "Network error. Please check if server is running.", type: "error" });
+      setMsg({ 
+        text: "Network error: Unable to reach backend server. You can continue immediately in Offline Mode:", 
+        type: "error",
+        allowOffline: true 
+      });
     } finally { setLoading(false); }
   }
 
   async function handleRegister(e) {
     e.preventDefault();
-    setLoading(true); setMsg({ text: "", type: "" });
+    setLoading(true); setMsg({ text: "", type: "", allowOffline: false });
     try {
       const r = await fetch(`${API}/api/auth/register`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -67,7 +105,14 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
           state: "Maharashtra"
         })
       });
-      const d = await r.json();
+
+      let d = {};
+      try {
+        d = await r.json();
+      } catch {
+        d = {};
+      }
+
       if (r.ok && (d.token || d.success)) {
         if (d.token) {
           localStorage.setItem("agri_token", d.token);
@@ -89,11 +134,21 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
           setMsg({ text: d.message || "Account created! Please log in.", type: "success" });
           setTab("login");
         }
+      } else if (r.status === 404) {
+        setMsg({ 
+          text: "Registration endpoint not found on server (404). You can continue immediately in Offline Mode:", 
+          type: "error",
+          allowOffline: true 
+        });
       } else {
         setMsg({ text: d.error || d.message || "Registration failed", type: "error" });
       }
     } catch {
-      setMsg({ text: "Network error. Please check if server is running.", type: "error" });
+      setMsg({ 
+        text: "Network error: Unable to reach backend server. You can continue immediately in Offline Mode:", 
+        type: "error",
+        allowOffline: true 
+      });
     } finally { setLoading(false); }
   }
 
@@ -221,7 +276,35 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
           </form>
         )}
 
-        {msg.text && <div className={`form-msg ${msg.type}`}>{msg.text}</div>}
+        {msg.text && (
+          <div className={`form-msg ${msg.type}`} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div>{msg.text}</div>
+            {msg.allowOffline && (
+              <button
+                type="button"
+                onClick={loginOffline}
+                className="btn btn-secondary"
+                style={{
+                  marginTop: "4px",
+                  fontSize: "0.85rem",
+                  padding: "8px 12px",
+                  background: "#f0fdf4",
+                  border: "1px solid #16a34a",
+                  color: "#166534",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px"
+                }}
+              >
+                Continue in Offline Mode (Instant Access)
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

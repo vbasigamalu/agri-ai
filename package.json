@@ -10,6 +10,10 @@
     "build": "npm --prefix client run build",
     "start": "npm --prefix backend start"
   },
+  "workspaces": [
+    "backend",
+    "client"
+  ],
   "keywords": [
     "agri-ai",
     "crop-disease",

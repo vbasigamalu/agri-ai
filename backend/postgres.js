@@ -69,10 +69,11 @@ async function initPostgres() {
         await client.query(createUsersTableQuery);
         console.log("   ✅ PostgreSQL [users] table verified & ready");
         client.release();
+        return true;
     } catch (err) {
         isPostgresConnected = false;
-        console.warn("⚠️  PostgreSQL Connection Notice:", err.message);
-        console.warn("   ℹ️  Note: Authentication features require PostgreSQL. All vision/disease/pest features work normally.");
+        console.log("ℹ️  Running in Local Storage Mode (PostgreSQL offline). User auth, GIS outbreak maps, and expert queues are running seamlessly on local storage.");
+        return false;
     }
 }
 

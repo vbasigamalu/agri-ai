@@ -34,14 +34,10 @@ const alertRoutes    = require("./routes/alertRoutes");
 const mlRoutes       = require("./routes/mlExperimentRoutes");
 const { initSpatialDB, recordSpatialReport } = require("./spatial");
 const { initExpertDB, enqueueCase } = require("./expert");
+const { createFollowupCaseFromScan } = require("./services/followupService");
 const { initBackgroundJobs } = require("./jobs/queue");
 const { analyzeLeafSymptoms, groundedChat } = require("./vision/vlmExplainer");
 
-// Initialize PostgreSQL Subsystems & Background Queues
-initPostgres();
-initSpatialDB();
-initExpertDB();
-initBackgroundJobs();
 
 // MongoDB Connection — non-fatal: server runs even if Atlas is unreachable
 // (common cause: free-tier cluster paused, or IP not whitelisted in Atlas)
@@ -432,57 +428,22 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
         // ── 5.7 Persist Case & Auto-Schedule Follow-up Monitoring ────────────
         if (leafDetected && result.status !== "retake_required") {
             try {
-                const caseRef = `CASE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-                const caseRes = await query(`
-                    INSERT INTO cases (
-                        case_ref, farmer_id, farmer_name, crop, category, current_status,
-                        primary_condition, initial_confidence, initial_severity, field_latitude,
-                        field_longitude, district, village, geom
-                    ) VALUES (
-                        $1, $2, $3, $4, 'disease', 'active', $5, $6, $7, $8, $9, $10, $11,
-                        ST_SetSRID(ST_MakePoint($9, $8), 4326)
-                    ) RETURNING id;
-                `, [
-                    caseRef,
-                    req.user ? req.user.id : null,
-                    req.user ? req.user.name : (req.body.farmerName || "Farmer"),
-                    result.crop || "Tomato",
-                    result.disease || "Crop Condition",
-                    confidencePercent || 88,
-                    result.severity || "Moderate",
-                    lat || 16.8524,
-                    lon || 74.5815,
-                    req.user ? req.user.district : (req.body.district || "Sangli"),
-                    req.user ? req.user.village : (req.body.village || "Miraj")
-                ]);
+                const createdCase = await createFollowupCaseFromScan({
+                    crop: result.crop || (result.label && result.label.includes("___") ? result.label.split("___")[0].replace(/_/g, " ") : "Tomato"),
+                    disease: result.disease || "Crop Condition",
+                    severity: result.severity || "Moderate",
+                    confidence: confidenceVal || 0.9,
+                    district: req.user ? req.user.district : (req.body.district || "Sangli"),
+                    village: req.user ? req.user.village : (req.body.village || "Miraj"),
+                    farmerName: req.user ? req.user.name : (req.body.farmerName || "Farmer"),
+                    imageBuffer: req.file ? req.file.buffer : null,
+                    fileName: req.file ? req.file.originalname : "leaf_scan.jpg"
+                });
 
-                if (caseRes.rows.length > 0) {
-                    const newCaseId = caseRes.rows[0].id;
-
-                    // Insert treatment if spray prescribed
-                    if (result.spray) {
-                        await query(`
-                            INSERT INTO treatments (case_id, spray_name, dosage_per_acre, safety_precautions)
-                            VALUES ($1, $2, $3, $4);
-                        `, [
-                            newCaseId,
-                            result.spray,
-                            result.spray_quantity || "200 ml / acre",
-                            result.sprayWarnings || []
-                        ]);
-                    }
-
-                    // Auto-schedule Follow-up for Day 5
-                    const schedDate = new Date();
-                    schedDate.setDate(schedDate.getDate() + 5);
-                    await query(`
-                        INSERT INTO followups (case_id, followup_number, scheduled_date, status, farmer_notes)
-                        VALUES ($1, 1, $2, 'pending', 'Automated Day 5 Follow-up scheduled for recovery monitoring.');
-                    `, [newCaseId, schedDate]);
-
-                    responsePayload.caseRef = caseRef;
-                    responsePayload.nextFollowupDate = schedDate.toISOString().split("T")[0];
-                    console.log(`   📋 [Cases & Follow-up] Created ${caseRef} with Day 5 follow-up scheduled for ${responsePayload.nextFollowupDate}`);
+                if (createdCase) {
+                    responsePayload.caseRef = createdCase.case_ref;
+                    responsePayload.nextFollowupDate = createdCase.next_followup_date;
+                    console.log(`   📋 [Cases & Follow-up] Registered ${createdCase.case_ref} with Day 5 follow-up scheduled.`);
                 }
             } catch (caseErr) {
                 console.warn("   ⚠️ Case auto-creation notice:", caseErr.message);
@@ -707,6 +668,7 @@ if (require.main === module) {
         await initPostgres();
         await initSpatialDB();
         await initExpertDB();
+        initBackgroundJobs();
 
         // Initialize TensorFlow.js Classifier
         initClassifier().catch(err => console.error("   ❌ Initializer Failed:", err.message));

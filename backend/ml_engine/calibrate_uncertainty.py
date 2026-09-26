@@ -35,7 +35,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 print = functools.partial(print, flush=True)
 
-import onnxruntime as ort
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
 from sklearn.metrics import roc_auc_score, roc_curve
 
 DATASET_DIR = Path(__file__).parent.parent / "dataset"
@@ -113,6 +116,11 @@ def run_calibration():
     with open(LABELS_PATH, "r", encoding="utf-8") as f:
         class_names = json.load(f)
     print(f"Loaded {len(class_names)} in-distribution classes (Tomato specialist).")
+
+    if ort is None:
+        print("❌ [ML Engine] 'onnxruntime' is not installed in this Python environment.")
+        print("   To calibrate model uncertainty, install: pip install onnxruntime scikit-learn")
+        return
 
     sess = ort.InferenceSession(str(ONNX_PATH))
     input_name = sess.get_inputs()[0].name

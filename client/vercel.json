@@ -1,0 +1,32 @@
+{
+  "rewrites": [
+    {
+      "source": "/analyze",
+      "destination": "https://agri-ai-backend.onrender.com/analyze"
+    },
+    {
+      "source": "/chat",
+      "destination": "https://agri-ai-backend.onrender.com/chat"
+    },
+    {
+      "source": "/history",
+      "destination": "https://agri-ai-backend.onrender.com/history"
+    },
+    {
+      "source": "/status",
+      "destination": "https://agri-ai-backend.onrender.com/status"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://agri-ai-backend.onrender.com/api/$1"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://agri-ai-backend.onrender.com/uploads/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -29,6 +29,7 @@ import {
   RefreshIcon,
   LocationPinIcon,
   ClockIcon,
+  CalendarIcon,
   GlobeIcon,
   FlaskIcon
 } from "./Icons";
@@ -104,12 +105,12 @@ function extractExifGps(file) {
   });
 }
 
-export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onNavigateToExpert }) {
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
+export default function DiseaseTab({ user, savedScan, onSaveScan, onScanCompleted, onNavigateToMap, onNavigateToExpert, onNavigateToFollowup }) {
+  const [image, setImage] = useState(savedScan?.image || null);
+  const [preview, setPreview] = useState(savedScan?.preview || null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(savedScan?.result || null);
 
   // Location State initialized from previous scan or user profile district
   const initialGeo = resolveInitialLocation(user);
@@ -429,6 +430,9 @@ export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onN
 
       setResult(data);
       setStatus("");
+      if (typeof onSaveScan === "function") {
+        onSaveScan({ result: data, preview, image });
+      }
 
       // Save to localStorage history so it's always accessible in HistoryTab
       try {
@@ -1420,6 +1424,135 @@ export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onN
                   </ul>
                 </div>
               )}
+
+              {/* Integrated Follow-up, GIS & Expert Workflow Hub */}
+              <div style={{
+                marginTop: "1.2rem",
+                padding: "1rem 1.15rem",
+                background: "linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)",
+                borderRadius: "12px",
+                border: "1.5px solid #86efac",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "0.5rem" }}>
+                  <SparklesIcon size={18} color="#15803d" />
+                  <strong style={{ color: "#15803d", fontSize: "0.92rem" }}>
+                    Connected Smart Farm Actions &amp; Monitoring
+                  </strong>
+                </div>
+                <p style={{ fontSize: "0.8rem", color: "#334155", margin: "0 0 0.85rem 0", lineHeight: 1.45 }}>
+                  Track Day 1 vs Day 5 lesion recovery, explore regional cluster spread in PostGIS, or escalate for agronomist ground-truthing.
+                </p>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {onNavigateToFollowup && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => onNavigateToFollowup(result.caseRef)}
+                      style={{
+                        padding: "0.45rem 0.9rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        background: "#16a34a",
+                        borderColor: "#16a34a",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <CalendarIcon size={14} color="#ffffff" />
+                      <span>{result.caseRef ? `Track Case ${result.caseRef} in Follow-up` : "Schedule Day 5 Follow-up"}</span>
+                      <ArrowRightIcon size={12} color="#ffffff" />
+                    </button>
+                  )}
+
+                  {onNavigateToMap && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onNavigateToMap}
+                      style={{
+                        padding: "0.45rem 0.9rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        color: "#2563eb",
+                        background: "#ffffff",
+                        borderColor: "#bfdbfe",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <MapIcon size={14} color="#2563eb" />
+                      <span>View on GIS Outbreak Map</span>
+                      <ArrowRightIcon size={12} color="#2563eb" />
+                    </button>
+                  )}
+
+                  {onNavigateToExpert && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onNavigateToExpert}
+                      style={{
+                        padding: "0.45rem 0.9rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        color: "#ea580c",
+                        background: "#ffffff",
+                        borderColor: "#fed7aa",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <ExpertIcon size={14} color="#ea580c" />
+                      <span>Agronomist Queue</span>
+                    </button>
+                  )}
+
+                  {!diseaseEscalatedCaseRef && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={escalateDiseaseToExpert}
+                      disabled={isEscalatingToExpert}
+                      style={{
+                        padding: "0.45rem 0.9rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 600,
+                        color: "#0369a1",
+                        background: "#ffffff",
+                        borderColor: "#bae6fd",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <FlaskIcon size={14} color="#0284c7" />
+                      <span>{isEscalatingToExpert ? "Escalating..." : "Request Agronomist Review"}</span>
+                    </button>
+                  )}
+
+                  {diseaseEscalatedCaseRef && (
+                    <span style={{
+                      padding: "0.45rem 0.8rem",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      color: "#15803d",
+                      background: "#dcfce7",
+                      borderRadius: "6px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px"
+                    }}>
+                      <CheckCircleIcon size={14} color="#15803d" />
+                      <span>Case Enqueued: {diseaseEscalatedCaseRef}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

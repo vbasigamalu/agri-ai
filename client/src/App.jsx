@@ -66,12 +66,14 @@ export default function App() {
   const [mlExperiments, setMlExperiments] = useState([]);
   const [showMlModal, setShowMlModal] = useState(false);
   const [loadingMl, setLoadingMl] = useState(false);
+  const [activeFollowupCaseRef, setActiveFollowupCaseRef] = useState(null);
+  const [savedDiseaseScan, setSavedDiseaseScan] = useState(null);
 
   // Fetch district alerts on mount
   useEffect(() => {
     async function fetchAlerts() {
       try {
-        const res = await fetch(`http://localhost:5000/api/alerts?district=${encodeURIComponent(user?.district || "Sangli")}`);
+        const res = await fetch(`/api/alerts?district=${encodeURIComponent(user?.district || "Sangli")}`);
         if (res.ok) {
           const data = await res.json();
           setAlerts(data.alerts || []);
@@ -89,7 +91,7 @@ export default function App() {
     if (mlExperiments.length === 0) {
       try {
         setLoadingMl(true);
-        const res = await fetch("http://localhost:5000/api/ml/experiments");
+        const res = await fetch("/api/ml/experiments");
         if (res.ok) {
           const data = await res.json();
           setMlExperiments(data.experiments || data.benchmarks || []);
@@ -174,6 +176,15 @@ export default function App() {
     setCurrentView("app");
   }
 
+  // Map resize fix when switching to map tab
+  useEffect(() => {
+    if (tab === "map") {
+      setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 150);
+    }
+  }, [tab]);
+
   // 1. Landing Page View (with interactive Login Option Modal)
   if (currentView === "landing") {
     return (
@@ -228,6 +239,7 @@ export default function App() {
       />
     );
   }
+
 
   const activeItem = NAV_ITEMS.find((n) => n.id === tab) || NAV_ITEMS[0];
   const ActiveIcon = activeItem.Icon;
@@ -450,14 +462,19 @@ export default function App() {
           {tab === "disease"  && (
             <DiseaseTab
               user={user}
+              savedScan={savedDiseaseScan}
+              onSaveScan={setSavedDiseaseScan}
               onScanCompleted={setLastScanLocation}
               onNavigateToMap={() => setTab("map")}
               onNavigateToExpert={() => setTab("expert")}
-              onNavigateToFollowup={() => setTab("followup")}
+              onNavigateToFollowup={(caseRef) => {
+                if (caseRef) setActiveFollowupCaseRef(caseRef);
+                setTab("followup");
+              }}
             />
           )}
           {tab === "followup" && (
-            <FollowupTab user={user} />
+            <FollowupTab user={user} initialCaseRef={activeFollowupCaseRef} />
           )}
           {tab === "map"      && (
             <OutbreakMapTab

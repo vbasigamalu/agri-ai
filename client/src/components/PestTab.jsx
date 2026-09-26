@@ -249,9 +249,9 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
     }
 
     window.speechSynthesis.cancel();
-    const pestName = result.pest || result.pestName || "Pest species";
-    const bioText = (result.biologicalControl || []).slice(0, 2).join(". ");
-    const chemText = (result.chemicalControl || []).slice(0, 2).join(". ");
+    const pestName = result.pest?.name || (typeof result.pest === "string" ? result.pest : null) || result.pestName || "Pest species";
+    const bioText = (result.biologicalControl || result.recommendations?.biologicalControl || []).slice(0, 2).join(". ");
+    const chemText = (result.chemicalControl || result.recommendations?.chemicalControl || []).slice(0, 2).join(". ");
 
     let txt = "";
     if (voiceLang === "mr") {
@@ -273,13 +273,13 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
     window.speechSynthesis.speak(u);
   }
 
-  const rawPestName = typeof result?.pest === "string" 
+  const rawPestName = result?.pest?.id || result?.pest?.name || (typeof result?.pest === "string" 
     ? result.pest 
     : (typeof result?.pestName === "string" 
       ? result.pestName 
-      : (typeof result?.pestId === "string" ? result.pestId : ""));
+      : (typeof result?.pestId === "string" ? result.pestId : "")));
   const detectedKey = rawPestName.toLowerCase();
-  let matchedEtl = 20;
+  let matchedEtl = result?.infestation?.threshold || 20;
   for (const [k, v] of Object.entries(ETL_MAP)) {
     if (detectedKey.includes(k)) { matchedEtl = v; break; }
   }
@@ -516,11 +516,16 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
               <div className="card mb-2">
                 <div className="card-title">Identified Pest Species</div>
                 <div className="card-value" style={{ color: "var(--text)" }}>
-                  {result.pest || result.pestName || "Unknown Insect"}
+                  {result.pest?.name || (typeof result.pest === "string" ? result.pest : null) || result.pestName || "Unknown Insect"}
+                  {result.pest?.scientificName && (
+                    <span style={{ fontSize: "0.85rem", fontStyle: "italic", color: "var(--text-secondary)", marginLeft: "8px" }}>
+                      ({result.pest.scientificName})
+                    </span>
+                  )}
                 </div>
-                {result.confidence && (
+                {(result.pest?.confidence || result.confidence) && (
                   <div className="text-muted mt-1">
-                    Vision Confidence: <strong>{Math.round((result.confidence || 0) * 100)}%</strong>
+                    Vision Confidence: <strong>{Math.round(((result.pest?.confidence || result.confidence || 0) <= 1 ? (result.pest?.confidence || result.confidence || 0) * 100 : (result.pest?.confidence || result.confidence || 0)))}%</strong>
                   </div>
                 )}
               </div>
@@ -744,8 +749,10 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
                       <LeafIcon size={16} color="var(--green-dark)" /> Organic &amp; Biological Control
                     </h4>
                     <ul className="advice-list">
-                      {(result.biologicalControl && result.biologicalControl.length > 0
+                      {((result.biologicalControl && result.biologicalControl.length > 0)
                         ? result.biologicalControl
+                        : (result.recommendations?.biologicalControl && result.recommendations.biologicalControl.length > 0)
+                        ? result.recommendations.biologicalControl
                         : ["Install species-specific pheromone or sticky cards.", "Conserve predatory beneficial insects (Ladybirds, Chrysoperla).", "Spray neem seed kernel extract (NSKE 5%) or Azadirachtin."]
                       ).map((b, i) => (
                         <li key={i}>{b}</li>
@@ -760,8 +767,10 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
                       <FlaskIcon size={16} color="var(--orange)" /> CIB&amp;RC Approved Insecticide Interventions
                     </h4>
                     <ul className="advice-list orange">
-                      {(result.chemicalControl && result.chemicalControl.length > 0
+                      {((result.chemicalControl && result.chemicalControl.length > 0)
                         ? result.chemicalControl
+                        : (result.recommendations?.chemicalControl && result.recommendations.chemicalControl.length > 0)
+                        ? result.recommendations.chemicalControl
                         : ["Apply recommended systemic insecticide if trap count exceeds ETL.", "Spray early morning or late afternoon to avoid honeybee activity."]
                       ).map((c, i) => (
                         <li key={i}>{c}</li>
@@ -776,7 +785,7 @@ export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavi
                       <ShieldIcon size={16} color="var(--blue)" /> Cultural &amp; Preventive Measures
                     </h4>
                     <ul className="advice-list blue">
-                      {((result.prevention && result.prevention.length > 0 ? result.prevention : (result.preventiveMeasures && result.preventiveMeasures.length > 0 ? result.preventiveMeasures : null)) ||
+                      {((result.prevention && result.prevention.length > 0 ? result.prevention : (result.preventiveMeasures && result.preventiveMeasures.length > 0 ? result.preventiveMeasures : (result.recommendations?.prevention && result.recommendations.prevention.length > 0 ? result.recommendations.prevention : null))) ||
                         ["Maintain field sanitation and remove weed hosts on borders.", "Adopt crop rotation with non-host crops.", "Deep summer ploughing to expose pupae to solar heat."]
                       ).map((p, i) => (
                         <li key={i}>{p}</li>

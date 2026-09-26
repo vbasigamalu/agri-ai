@@ -17,7 +17,8 @@ import {
   FlameIcon,
   LockIcon,
   LayersIcon,
-  TargetIcon
+  TargetIcon,
+  DatabaseIcon
 } from "./Icons";
 
 const API = "";

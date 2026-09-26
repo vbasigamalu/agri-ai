@@ -19,42 +19,46 @@ const { classifyDisease } = require("../classifier");
  * List all follow-up monitoring cases
  */
 async function getAllFollowupCases() {
-    const res = await query(`
-        SELECT 
-            c.id AS case_id,
-            c.case_ref,
-            c.crop,
-            c.category,
-            c.primary_condition,
-            c.initial_confidence,
-            c.initial_severity,
-            c.district,
-            c.village,
-            c.current_status,
-            c.created_at AS diagnosed_at,
-            f.id AS followup_id,
-            f.followup_number,
-            f.scheduled_date,
-            f.completed_date,
-            f.status AS followup_status,
-            f.progression_status,
-            f.severity_delta_percent,
-            f.verdict,
-            f.farmer_notes,
-            t.spray_name,
-            t.dosage_per_acre,
-            t.waiting_period_days,
-            i1.storage_url AS day1_image_url,
-            i2.storage_url AS day5_image_url
-        FROM cases c
-        LEFT JOIN followups f ON c.id = f.case_id
-        LEFT JOIN treatments t ON c.id = t.case_id
-        LEFT JOIN images i1 ON c.id = i1.case_id AND i1.image_type = 'leaf_original'
-        LEFT JOIN images i2 ON f.followup_image_id = i2.id
-        ORDER BY f.scheduled_date ASC, c.created_at DESC;
-    `);
+    try {
+        const res = await query(`
+            SELECT 
+                c.id AS case_id,
+                c.case_ref,
+                c.crop,
+                c.category,
+                c.primary_condition,
+                c.initial_confidence,
+                c.initial_severity,
+                c.district,
+                c.village,
+                c.current_status,
+                c.created_at AS diagnosed_at,
+                f.id AS followup_id,
+                f.followup_number,
+                f.scheduled_date,
+                f.completed_date,
+                f.status AS followup_status,
+                f.progression_status,
+                f.severity_delta_percent,
+                f.verdict,
+                f.farmer_notes,
+                t.spray_name,
+                t.dosage_per_acre,
+                t.waiting_period_days,
+                i1.storage_url AS day1_image_url,
+                i2.storage_url AS day5_image_url
+            FROM cases c
+            LEFT JOIN followups f ON c.id = f.case_id
+            LEFT JOIN treatments t ON c.id = t.case_id
+            LEFT JOIN images i1 ON c.id = i1.case_id AND i1.image_type = 'leaf_original'
+            LEFT JOIN images i2 ON f.followup_image_id = i2.id
+            ORDER BY f.scheduled_date ASC, c.created_at DESC;
+        `);
 
-    return res.rows;
+        return res.rows || [];
+    } catch (err) {
+        return [];
+    }
 }
 
 /**

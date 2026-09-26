@@ -37,11 +37,6 @@ const { initExpertDB, enqueueCase } = require("./expert");
 const { initBackgroundJobs } = require("./jobs/queue");
 const { analyzeLeafSymptoms, groundedChat } = require("./vision/vlmExplainer");
 
-// Initialize PostgreSQL Subsystems & Background Queues
-initPostgres();
-initSpatialDB();
-initExpertDB();
-initBackgroundJobs();
 
 // MongoDB Connection — non-fatal: server runs even if Atlas is unreachable
 // (common cause: free-tier cluster paused, or IP not whitelisted in Atlas)
@@ -707,6 +702,7 @@ if (require.main === module) {
         await initPostgres();
         await initSpatialDB();
         await initExpertDB();
+        initBackgroundJobs();
 
         // Initialize TensorFlow.js Classifier
         initClassifier().catch(err => console.error("   ❌ Initializer Failed:", err.message));

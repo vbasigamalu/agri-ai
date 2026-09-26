@@ -105,12 +105,12 @@ function extractExifGps(file) {
   });
 }
 
-export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onNavigateToExpert, onNavigateToFollowup }) {
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
+export default function DiseaseTab({ user, savedScan, onSaveScan, onScanCompleted, onNavigateToMap, onNavigateToExpert, onNavigateToFollowup }) {
+  const [image, setImage] = useState(savedScan?.image || null);
+  const [preview, setPreview] = useState(savedScan?.preview || null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(savedScan?.result || null);
 
   // Location State initialized from previous scan or user profile district
   const initialGeo = resolveInitialLocation(user);
@@ -430,6 +430,9 @@ export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onN
 
       setResult(data);
       setStatus("");
+      if (typeof onSaveScan === "function") {
+        onSaveScan({ result: data, preview, image });
+      }
 
       // Save to localStorage history so it's always accessible in HistoryTab
       try {

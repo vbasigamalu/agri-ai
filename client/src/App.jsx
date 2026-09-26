@@ -70,7 +70,7 @@ export default function App() {
   useEffect(() => {
     async function fetchAlerts() {
       try {
-        const res = await fetch(`http://localhost:5000/api/alerts?district=${encodeURIComponent(user?.district || "Sangli")}`);
+        const res = await fetch(`/api/alerts?district=${encodeURIComponent(user?.district || "Sangli")}`);
         if (res.ok) {
           const data = await res.json();
           setAlerts(data.alerts || []);
@@ -88,7 +88,7 @@ export default function App() {
     if (mlExperiments.length === 0) {
       try {
         setLoadingMl(true);
-        const res = await fetch("http://localhost:5000/api/ml/experiments");
+        const res = await fetch("/api/ml/experiments");
         if (res.ok) {
           const data = await res.json();
           setMlExperiments(data.experiments || data.benchmarks || []);

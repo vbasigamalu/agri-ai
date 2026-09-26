@@ -117,6 +117,14 @@ export default function App() {
     setUser(null);
   }
 
+  useEffect(() => {
+    if (tab === "map") {
+      setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 150);
+    }
+  }, [tab]);
+
   if (!user) return <AuthPage onLogin={handleLogin} />;
 
   const activeItem = NAV_ITEMS.find((n) => n.id === tab) || NAV_ITEMS[0];
@@ -312,9 +320,9 @@ export default function App() {
           </div>
         </header>
 
-        {/* Content Container */}
+        {/* Content Container with Persistent Tab State */}
         <main className="content-container">
-          {tab === "disease"  && (
+          <div style={{ display: tab === "disease" ? "block" : "none" }}>
             <DiseaseTab
               user={user}
               onScanCompleted={setLastScanLocation}
@@ -325,28 +333,38 @@ export default function App() {
                 setTab("followup");
               }}
             />
-          )}
-          {tab === "followup" && (
+          </div>
+
+          <div style={{ display: tab === "followup" ? "block" : "none" }}>
             <FollowupTab user={user} initialCaseRef={activeFollowupCaseRef} />
-          )}
-          {tab === "map"      && (
+          </div>
+
+          <div style={{ display: tab === "map" ? "block" : "none" }}>
             <OutbreakMapTab
               user={user}
               activeScan={lastScanLocation}
               onNavigateToExpert={() => setTab("expert")}
             />
-          )}
-          {tab === "pest"     && (
+          </div>
+
+          <div style={{ display: tab === "pest" ? "block" : "none" }}>
             <PestTab
               user={user}
               onScanCompleted={setLastScanLocation}
               onNavigateToMap={() => setTab("map")}
               onNavigateToExpert={() => setTab("expert")}
             />
-          )}
-          {tab === "forecast" && <ForecastTab />}
-          {tab === "history"  && <HistoryTab     user={user} />}
-          {tab === "expert"   && (
+          </div>
+
+          <div style={{ display: tab === "forecast" ? "block" : "none" }}>
+            <ForecastTab />
+          </div>
+
+          <div style={{ display: tab === "history" ? "block" : "none" }}>
+            <HistoryTab user={user} />
+          </div>
+
+          <div style={{ display: tab === "expert" ? "block" : "none" }}>
             <ExpertTab
               user={user}
               onNavigateToMap={(loc) => {
@@ -354,7 +372,7 @@ export default function App() {
                 setTab("map");
               }}
             />
-          )}
+          </div>
         </main>
       </div>
 

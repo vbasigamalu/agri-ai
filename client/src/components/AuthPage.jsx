@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LeafIcon, UserIcon } from "./Icons";
 
 const API = "";
 
@@ -114,7 +115,9 @@ export default function AuthPage({ onLogin }) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="logo-icon">🌱</span>
+          <span className="logo-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <LeafIcon size={28} color="#10b981" />
+          </span>
           <h1>Agri-AI</h1>
           <p>Smart Crop Health &amp; Advisory Platform</p>
         </div>
@@ -135,11 +138,11 @@ export default function AuthPage({ onLogin }) {
               <input className="form-input" type="password" value={form.password} onChange={set("password")} placeholder="••••••••" required />
             </div>
             <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-              {loading ? "Logging in..." : "Log In →"}
+              {loading ? "Logging in..." : "Log In"}
             </button>
             <div className="form-divider">or</div>
-            <button type="button" className="btn btn-secondary btn-full" onClick={guestLogin}>
-              🌾 Continue as Guest Farmer
+            <button type="button" className="btn btn-secondary btn-full" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }} onClick={guestLogin}>
+              <UserIcon size={16} color="currentColor" /> Continue as Guest Farmer
             </button>
           </form>
         ) : (
@@ -169,9 +172,9 @@ export default function AuthPage({ onLogin }) {
             <div className="form-group">
               <label className="form-label">Role</label>
               <select className="form-input" value={form.role} onChange={set("role")}>
-                <option value="farmer">🌾 Farmer</option>
-                <option value="officer">🏛️ Agriculture Officer</option>
-                <option value="expert">🔬 Agronomist / Expert</option>
+                <option value="farmer">Farmer</option>
+                <option value="officer">Agriculture Officer</option>
+                <option value="expert">Agronomist / Expert</option>
               </select>
             </div>
             <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>

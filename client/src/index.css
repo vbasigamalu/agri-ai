@@ -1382,3 +1382,33 @@ input, select, textarea { font-family: inherit; }
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ═══════════════════════════════════════════════
+   POSTGIS & LEAFLET MAP STYLES
+   ═══════════════════════════════════════════════ */
+@keyframes ping-slow {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(0.95); opacity: 0; }
+}
+
+.custom-outbreak-marker, .custom-farmer-beacon {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+}
+
+@media (max-width: 960px) {
+  .spatial-outbreak-container > div:last-child {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -21,11 +21,27 @@ const mongoose = require("mongoose");
 const { Analysis, ChatSession } = require("./models");
 const { initClassifier, classify, isReady } = require("./classifier");
 const { getDiseaseInfo, searchByKeyword, getSpraySafetyCheck } = require("./cropDatabase");
-const { initPostgres } = require("./postgres");
+const { initPostgres, query } = require("./postgres");
 const { optionalAuth, authenticateToken } = require("./middleware/auth");
 const authRoutes     = require("./routes/auth");
 const pestRoutes     = require("./routes/pestRoutes");
 const forecastRoutes = require("./routes/forecastRoutes");
+const spatialRoutes  = require("./routes/spatialRoutes");
+const expertRoutes   = require("./routes/expertRoutes");
+const followupRoutes = require("./routes/followupRoutes");
+const chatbotRoutes  = require("./routes/chatbotRoutes");
+const alertRoutes    = require("./routes/alertRoutes");
+const mlRoutes       = require("./routes/mlExperimentRoutes");
+const { initSpatialDB, recordSpatialReport } = require("./spatial");
+const { initExpertDB, enqueueCase } = require("./expert");
+const { initBackgroundJobs } = require("./jobs/queue");
+const { analyzeLeafSymptoms, groundedChat } = require("./vision/vlmExplainer");
+
+// Initialize PostgreSQL Subsystems & Background Queues
+initPostgres();
+initSpatialDB();
+initExpertDB();
+initBackgroundJobs();
 
 // MongoDB Connection — non-fatal: server runs even if Atlas is unreachable
 // (common cause: free-tier cluster paused, or IP not whitelisted in Atlas)
@@ -57,7 +73,8 @@ connectMongo();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 // Serve modern React UI build if client/dist exists, else fallback to frontend/
 const clientDistPath = path.join(__dirname, "../client/dist");
@@ -73,6 +90,13 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/pest", pestRoutes);
 app.use("/api/forecast", forecastRoutes);
+app.use("/api/spatial", spatialRoutes);
+app.use("/api/expert", expertRoutes);
+app.use("/api/followup", followupRoutes);
+app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/alerts", alertRoutes);
+app.use("/api/ml", mlRoutes);
+app.use("/dataset", express.static(path.join(__dirname, "dataset")));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -222,6 +246,31 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
             ? result.confidencePercent
             : parseFloat((confidenceVal * 100).toFixed(1));
 
+        // ── 3.5 VLM Secondary Visual-Intelligence Layer ─────────────
+        let vlmEvidence = null;
+        if (leafDetected && result.status !== "retake_required") {
+            try {
+                vlmEvidence = await analyzeLeafSymptoms({
+                    imageBuffer: req.file.buffer,
+                    diagnosis: {
+                        crop: result.crop,
+                        disease: result.disease,
+                        label: result.label,
+                        confidence: confidenceVal || result.confidence || 0.9,
+                        severity: result.severity || "Moderate",
+                        symptoms: result.symptoms || []
+                    },
+                    weather: weatherData,
+                    language: req.body.language || req.user?.preferred_language || "en"
+                });
+                if (vlmEvidence) {
+                    console.log(`   🔬 VLM Visual Evidence: [${vlmEvidence.source}] Agreement: ${vlmEvidence.agreementScore}% (${vlmEvidence.latencyMs}ms)`);
+                }
+            } catch (vlmErr) {
+                console.warn("   ⚠️ VLM layer bypassed:", vlmErr.message);
+            }
+        }
+
         // ── 4. Construct Final Structured Response ─────────────────
         const responsePayload = {
             success: true,
@@ -256,6 +305,16 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
                 allPredictions: result.allPredictions || []
             },
 
+            // ── VLM Secondary Visual Intelligence Layer ────────────
+            vlmEvidence: vlmEvidence,
+            vlmSymptoms: (vlmEvidence && vlmEvidence.visibleSymptoms && vlmEvidence.visibleSymptoms.length > 0)
+                ? vlmEvidence.visibleSymptoms
+                : (result.symptoms || []),
+            vlmExplanation: vlmEvidence ? (vlmEvidence.farmerExplanation || vlmEvidence.morphologySummary || "") : "",
+            vlmAgreement: vlmEvidence ? vlmEvidence.agreement : true,
+            vlmAgreementScore: vlmEvidence ? vlmEvidence.agreementScore : confidencePercent,
+            vlmModel: vlmEvidence ? vlmEvidence.model : "qwen/qwen3.8-27b",
+
             uncertainty: {
                 flagged: isUncertain,
                 reason: uncertaintyReason,
@@ -272,7 +331,9 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
             affectedLeaves: result.affectedLeaves || (leafDetected ? "1/1" : "0/0"),
             multiLeafAnalysis: result.multiLeafAnalysis || null,
             preprocessing: result.preprocessing || null,
-            symptoms: result.symptoms || [],
+            symptoms: (vlmEvidence && vlmEvidence.visibleSymptoms && vlmEvidence.visibleSymptoms.length > 0)
+                ? vlmEvidence.visibleSymptoms
+                : (result.symptoms || []),
             advice: result.advice || [],
             prevention: result.prevention || [],
             spray: result.spray || "N/A",
@@ -318,6 +379,116 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
             }
         }
 
+        // ── 5.5 Persist to PostGIS Spatial Reports (Non-blocking) ──
+        if (leafDetected && result.status !== "retake_required" && lat && lon) {
+            recordSpatialReport({
+                farmerId: req.user ? req.user.id : null,
+                farmerName: req.user ? req.user.name : (req.body.farmerName || "Farmer"),
+                reportType: "disease",
+                crop: result.crop || "Crop",
+                disease: result.disease || "Crop Condition",
+                pest: null,
+                severity: result.severity || "Moderate",
+                confidence: confidenceVal || 0.88,
+                latitude: lat,
+                longitude: lon,
+                district: req.user ? req.user.district : (req.body.district || ""),
+                village: req.user ? req.user.village : (req.body.village || ""),
+                weatherTemp: weatherData.temp,
+                weatherHumidity: weatherData.humidity,
+                spray: result.spray || "N/A",
+                notes: `AI scan detection. Affected leaves: ${result.affectedLeaves || "1/1"}.`
+            }).then(() => {
+                console.log(`   🗺️ [PostGIS] Recorded spatial outbreak at [${lat.toFixed(2)}, ${lon.toFixed(2)}]`);
+            }).catch(spErr => {
+                console.warn("   ⚠️ PostGIS auto-sync notice:", spErr.message);
+            });
+        }
+
+        // ── 5.6 Auto-Enqueue for Expert Validation (HITL Active Learning) ──
+        if (leafDetected && (confidenceVal < 0.75 || result.status === "uncertain")) {
+            enqueueCase({
+                crop: result.crop || "Tomato",
+                aiDisease: result.disease || "Crop Condition",
+                aiConfidence: confidenceVal ? Math.round(confidenceVal * 100) : 60,
+                aiSeverity: result.severity || "Moderate",
+                aiStatus: result.status || "confirmed",
+                symptoms: result.symptoms || [],
+                vlmEvidence: vlmEvidence || {},
+                imageName: req.file ? req.file.originalname : "field_scan.jpg",
+                farmerId: req.user ? req.user.id : null,
+                farmerName: req.user ? req.user.name : "Anonymous Farmer",
+                district: req.user ? req.user.district : (req.body.district || "Sangli"),
+                village: req.user ? req.user.village : (req.body.village || "Miraj"),
+                latitude: lat,
+                longitude: lon
+            }).then((c) => {
+                console.log(`   👨‍🔬 [Expert Queue] Enqueued ${c.case_number} for Agronomist Review (${confidenceVal ? Math.round(confidenceVal * 100) : 60}% conf)`);
+            }).catch(eErr => {
+                console.warn("   ⚠️ Expert auto-queue notice:", eErr.message);
+            });
+        }
+
+        // ── 5.7 Persist Case & Auto-Schedule Follow-up Monitoring ────────────
+        if (leafDetected && result.status !== "retake_required") {
+            try {
+                const caseRef = `CASE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+                const caseRes = await query(`
+                    INSERT INTO cases (
+                        case_ref, farmer_id, farmer_name, crop, category, current_status,
+                        primary_condition, initial_confidence, initial_severity, field_latitude,
+                        field_longitude, district, village, geom
+                    ) VALUES (
+                        $1, $2, $3, $4, 'disease', 'active', $5, $6, $7, $8, $9, $10, $11,
+                        ST_SetSRID(ST_MakePoint($9, $8), 4326)
+                    ) RETURNING id;
+                `, [
+                    caseRef,
+                    req.user ? req.user.id : null,
+                    req.user ? req.user.name : (req.body.farmerName || "Farmer"),
+                    result.crop || "Tomato",
+                    result.disease || "Crop Condition",
+                    confidencePercent || 88,
+                    result.severity || "Moderate",
+                    lat || 16.8524,
+                    lon || 74.5815,
+                    req.user ? req.user.district : (req.body.district || "Sangli"),
+                    req.user ? req.user.village : (req.body.village || "Miraj")
+                ]);
+
+                if (caseRes.rows.length > 0) {
+                    const newCaseId = caseRes.rows[0].id;
+
+                    // Insert treatment if spray prescribed
+                    if (result.spray) {
+                        await query(`
+                            INSERT INTO treatments (case_id, spray_name, dosage_per_acre, safety_precautions)
+                            VALUES ($1, $2, $3, $4);
+                        `, [
+                            newCaseId,
+                            result.spray,
+                            result.spray_quantity || "200 ml / acre",
+                            result.sprayWarnings || []
+                        ]);
+                    }
+
+                    // Auto-schedule Follow-up for Day 5
+                    const schedDate = new Date();
+                    schedDate.setDate(schedDate.getDate() + 5);
+                    await query(`
+                        INSERT INTO followups (case_id, followup_number, scheduled_date, status, farmer_notes)
+                        VALUES ($1, 1, $2, 'pending', 'Automated Day 5 Follow-up scheduled for recovery monitoring.');
+                    `, [newCaseId, schedDate]);
+
+                    responsePayload.caseRef = caseRef;
+                    responsePayload.nextFollowupDate = schedDate.toISOString().split("T")[0];
+                    console.log(`   📋 [Cases & Follow-up] Created ${caseRef} with Day 5 follow-up scheduled for ${responsePayload.nextFollowupDate}`);
+                }
+            } catch (caseErr) {
+                console.warn("   ⚠️ Case auto-creation notice:", caseErr.message);
+            }
+        }
+
         return res.json(responsePayload);
 
     } catch (err) {
@@ -340,14 +511,14 @@ app.post("/analyze", optionalAuth, upload.single("image"), async (req, res) => {
 });
 
 
-// 2. CHAT ENGINE (Groq API AI)
+// 2. CHAT ENGINE (Groq API AI + Image-Grounded VLM)
 app.post(["/chat", "/api/chat"], async (req, res) => {
     const question = req.body.question || req.body.message;
-    const { history, language, context } = req.body;
+    const { history, language, context, imageBase64 } = req.body;
     if (!question) return res.status(400).json({ error: "No question asked" });
 
     try {
-        console.log(`\n💬 Chat Query: "${question}"`);
+        console.log(`\n💬 Chat Query: "${question}" (Has Leaf Image: ${Boolean(imageBase64)})`);
         
         if (!process.env.GROQ_API_KEY) {
             return res.json({ 
@@ -356,11 +527,29 @@ app.post(["/chat", "/api/chat"], async (req, res) => {
             });
         }
 
-        // Build messages array
+        // If active scan image is provided, use Image-Grounded VLM Chat!
+        if (imageBase64) {
+            try {
+                const imgBuf = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+                const vlmAnswer = await groundedChat({
+                    imageBuffer: imgBuf,
+                    question,
+                    history,
+                    scanContext: context || "",
+                    language: language || "en"
+                });
+                if (vlmAnswer) {
+                    return res.json({ answer: vlmAnswer, reply: vlmAnswer, source: "vlm-grounded" });
+                }
+            } catch (vlmChatErr) {
+                console.warn("   ⚠️ Grounded VLM chat fallback to text:", vlmChatErr.message);
+            }
+        }
+
+        // Standard Text Chat (Using active qwen/qwen3.8-27b on Groq)
         let messages = [];
-        
-        // Add a primary system prompt
-        let sysPrompt = `You are Agri-AI, an expert agricultural assistant. Answer questions clearly and concisely based on your expertise and the provided scan context. Refer to the scan results naturally. IMPORTANT: Never mention that the data is 'hardcoded' or from a 'local database'. Act as if this is your own expert knowledge. Respond in ${language || "English"}.`;
+        const langName = (language === "mr" || language === "marathi") ? "Marathi" : (language === "hi" || language === "hindi") ? "Hindi" : "clear, professional Standard English";
+        let sysPrompt = `You are Agri-AI, an expert agricultural assistant. Answer questions clearly and concisely based on your expertise and the provided scan context. Refer to the scan results naturally. IMPORTANT: Never mention that the data is 'hardcoded' or from a 'local database'. Act as if this is your own expert knowledge. Respond in ${langName}.`;
         if (context) {
             sysPrompt += ` Current Crop Scan Context: ${context}`;
         }
@@ -369,16 +558,15 @@ app.post(["/chat", "/api/chat"], async (req, res) => {
             content: sysPrompt
         });
 
-        // Add history from frontend — trim to last 10 messages (5 exchanges) to avoid token overflow
+        // Add history from frontend — trim to last 10 messages (5 exchanges)
         if (history && Array.isArray(history)) {
             const trimmed = history.slice(-10);
             messages = messages.concat(trimmed);
         }
 
-        // Add the current user question
         messages.push({ role: "user", content: question });
 
-        const activeModel = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+        const activeModel = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
         const response = await axios.post(
             "https://api.groq.com/openai/v1/chat/completions",
             {
@@ -391,18 +579,72 @@ app.post(["/chat", "/api/chat"], async (req, res) => {
                 headers: {
                     "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
                     "Content-Type": "application/json"
-                }
+                },
+                timeout: 8000
             }
         );
 
         let aiAnswer = response.data.choices[0].message.content || "";
-        // Clean out any internal <think> tags if model produces reasoning tokens
         aiAnswer = aiAnswer.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-        return res.json({ answer: aiAnswer, reply: aiAnswer });
+        return res.json({ answer: aiAnswer, reply: aiAnswer, source: "groq-llm" });
 
     } catch (err) { 
         console.error("Chat Error:", err.response ? err.response.data : err.message);
-        res.status(500).json({ error: "Brain error", answer: "Oops, my AI brain had a hiccup. Check the API key and internet connection.", reply: "Oops, my AI brain had a hiccup. Check the API key and internet connection." }); 
+        let fallbackMsg = "";
+        if (context) {
+            if (language === "mr" || language === "marathi") {
+                fallbackMsg = `तुमच्या पिकाच्या तपासणीनुसार (${context}): कृपया शिफारस केलेली फवारणी आणि वेळेचे पालन करा. अधिक माहितीसाठी वरील सल्ला पहा.`;
+            } else if (language === "hi" || language === "hindi") {
+                fallbackMsg = `आपकी फसल की जांच अनुसार (${context}): कृपया अनुशंसित छिड़काव और समय का पालन करें। अधिक जानकारी के लिए ऊपर दी गई सलाह देखें।`;
+            } else {
+                fallbackMsg = `Based on your crop scan (${context}): Please follow the prescribed spray dosage and timing. Check the detailed treatment card above for comprehensive action steps.`;
+            }
+        } else {
+            fallbackMsg = (language === "mr" || language === "marathi")
+                ? "माफ करा, तांत्रिक अडचणीमुळे उत्तर देता आले नाही. कृपया पुन्हा प्रयत्न करा."
+                : (language === "hi" || language === "hindi")
+                ? "क्षमा करें, तकनीकी समस्या के कारण उत्तर नहीं दिया जा सका। कृपया पुनः प्रयास करें।"
+                : "Sorry, I am experiencing high traffic. Please try again in a moment or refer to the diagnostic cards above.";
+        }
+        return res.json({ answer: fallbackMsg, reply: fallbackMsg, source: "resilient-fallback" }); 
+    }
+});
+
+// 2.5 VLM RE-EXPLAIN IN NEWLY SELECTED LANGUAGE
+app.post(["/api/vlm/re-explain", "/vlm/re-explain"], async (req, res) => {
+    try {
+        const { diagnosis, weather, language, imageBase64 } = req.body;
+        if (!diagnosis) {
+            return res.status(400).json({ error: "Diagnosis details are required" });
+        }
+        let imgBuf = null;
+        if (imageBase64) {
+            imgBuf = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+        }
+        const vlmEvidence = await analyzeLeafSymptoms({
+            imageBuffer: imgBuf,
+            diagnosis: {
+                crop: diagnosis.crop,
+                disease: diagnosis.disease,
+                label: diagnosis.label,
+                confidence: diagnosis.confidence || 0.9,
+                severity: diagnosis.severity || "Moderate",
+                symptoms: diagnosis.symptoms || []
+            },
+            weather: weather || {},
+            language: language || "en"
+        });
+
+        return res.json({
+            success: true,
+            language: language || "en",
+            vlmEvidence: vlmEvidence,
+            symptoms: vlmEvidence?.visibleSymptoms || diagnosis.symptoms || [],
+            farmerExplanation: vlmEvidence?.farmerExplanation || ""
+        });
+    } catch (err) {
+        console.error("VLM Re-explain Error:", err.message);
+        return res.status(500).json({ error: "Failed to re-explain leaf in requested language" });
     }
 });
 
@@ -463,6 +705,8 @@ if (require.main === module) {
         
         // Initialize PostgreSQL Database Connection & Tables
         await initPostgres();
+        await initSpatialDB();
+        await initExpertDB();
 
         // Initialize TensorFlow.js Classifier
         initClassifier().catch(err => console.error("   ❌ Initializer Failed:", err.message));

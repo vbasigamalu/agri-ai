@@ -1,6 +1,43 @@
 import { useState, useRef, useEffect } from "react";
+import { resolveInitialLocation, saveActiveScanLocation, MAHARASHTRA_DISTRICTS } from "../utils/geoUtils";
+import {
+  PestIcon,
+  LocationPinIcon,
+  MapIcon,
+  ExpertIcon,
+  CameraIcon,
+  TrendingUpIcon,
+  TrendingDownIcon,
+  CalendarIcon,
+  LeafIcon,
+  AlertTriangleIcon,
+  CheckCircleIcon,
+  VolumeIcon,
+  FlaskIcon,
+  ShieldIcon,
+  CloseIcon,
+  RefreshIcon,
+  SatelliteIcon,
+  MicroscopeIcon,
+  ChevronUpIcon,
+  ChevronDownIcon
+} from "./Icons";
 
 const API = "";
+
+const ETL_MAP = {
+  thrip: 20,
+  whitefly: 15,
+  aphid: 25,
+  borer: 5,
+  helicoverpa: 5,
+  fall_armyworm: 8,
+  armyworm: 8,
+  mite: 30,
+  caterpillar: 10,
+  jassid: 15,
+  default: 20
+};
 
 function etlColor(ratio) {
   if (ratio >= 2) return "red";
@@ -9,7 +46,13 @@ function etlColor(ratio) {
   return "green";
 }
 
-export default function PestTab() {
+export default function PestTab({ user, onScanCompleted, onNavigateToMap, onNavigateToExpert }) {
+  const initialGeo = resolveInitialLocation(user);
+  const [latLon, setLatLon] = useState({ lat: initialGeo.lat, lon: initialGeo.lon });
+  const [locationName, setLocationName] = useState(initialGeo.locationName);
+  const [isDetectingGps, setIsDetectingGps] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+
   const [image, setImage]         = useState(null);
   const [preview, setPreview]     = useState(null);
   const [count, setCount]         = useState(0);
@@ -20,6 +63,69 @@ export default function PestTab() {
   const [status, setStatus]       = useState("");
   const [result, setResult]       = useState(null);
   const [activeIpmTab, setActiveIpmTab] = useState("bio");
+
+  // Expert Validation Escalation State
+  const [isEscalating, setIsEscalating] = useState(false);
+  const [escalatedCaseRef, setEscalatedCaseRef] = useState(null);
+
+  async function escalatePestToExpert() {
+    if (!result || isEscalating) return;
+    setIsEscalating(true);
+    try {
+      const res = await fetch(`${API}/api/expert/enqueue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "pest",
+          crop: crop || "Tomato",
+          aiDisease: `${result.pest?.name || "Insect Pest"} (${result.pest?.scientificName || ""})`,
+          aiConfidence: Math.round((result.pest?.confidence || 0.7) * 100),
+          aiSeverity: `${result.infestation?.severity || "Moderate"} (Trap: ${count})`,
+          aiStatus: (result.pest?.confidence || 1) < 0.75 ? "uncertain" : "confirmed",
+          symptoms: result.recommendations?.symptoms || [`Pest scouting report for ${crop}`],
+          vlmEvidence: {
+            pestId: result.pest?.id,
+            trapCount: count,
+            etlStatus: result.infestation?.severity
+          },
+          imageUrl: result.imageUrl || preview || null,
+          imageName: image ? image.name : "pest_trap.jpg",
+          farmerName: user?.name || "Farmer",
+          district: user?.district || locationName.split(",")[0] || "Sangli",
+          village: user?.village || "Farm Field",
+          latitude: latLon.lat,
+          longitude: latLon.lon
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.case) {
+        setEscalatedCaseRef(data.case.case_number);
+      }
+    } catch (e) {
+      console.warn("Could not escalate pest to expert:", e);
+    } finally {
+      setIsEscalating(false);
+    }
+  }
+
+  function detectGps() {
+    if ("geolocation" in navigator) {
+      setIsDetectingGps(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          setLatLon({ lat, lon });
+          setLocationName(`Field GPS [${lat.toFixed(4)}, ${lon.toFixed(4)}]`);
+          setIsDetectingGps(false);
+        },
+        () => {
+          setIsDetectingGps(false);
+        },
+        { timeout: 8000 }
+      );
+    }
+  }
 
   // Camera
   const [showCamera, setShowCamera] = useState(false);
@@ -61,12 +167,32 @@ export default function PestTab() {
     fd.append("past3DaysCount", past3d);
     fd.append("past7DaysCount", past7d);
     fd.append("crop", crop);
+    fd.append("lat", latLon.lat);
+    fd.append("lon", latLon.lon);
+    fd.append("locationName", locationName);
+    if (user?.name) fd.append("farmerName", user.name);
 
     try {
       const r = await fetch(`${API}/api/pest/detect`, { method: "POST", body: fd });
       const d = await r.json();
       setResult(d);
       setStatus("");
+
+      // Save active scan location for GIS Outbreak Map
+      const activeScanLoc = saveActiveScanLocation({
+        lat: latLon.lat,
+        lon: latLon.lon,
+        locationName: locationName || "Pest Trap Location",
+        crop: crop || "Crop",
+        condition: d.pest?.name || "Pest Infestation",
+        category: "pest",
+        severity: d.infestation?.severity || "Moderate",
+        confidence: d.pest?.confidence || 0.88,
+        timestamp: new Date().toISOString()
+      });
+      if (typeof onScanCompleted === "function" && activeScanLoc) {
+        onScanCompleted(activeScanLoc);
+      }
     } catch {
       setStatus("Pest detection failed. Please check if the backend server is running.");
     } finally {
@@ -168,16 +294,89 @@ export default function PestTab() {
   return (
     <div>
       <div className="section-header">
-        <h2>🦗 Pest &amp; Trap Surveillance Monitor</h2>
+        <h2><PestIcon size={22} style={{ marginRight: 8, verticalAlign: "middle" }} /> Pest &amp; Trap Surveillance Monitor</h2>
         <p>AI pest identification, sticky trap threshold monitoring (ETL), and multi-day population trajectory tracking</p>
       </div>
+
+      {/* Trap Field Location Bar */}
+      <div className="location-chip-row" style={{ marginBottom: "1rem", flexWrap: "wrap", gap: "0.6rem" }}>
+        <div className="location-info">
+          <LocationPinIcon size={14} color="#059669" />
+          <span>Trap Location:</span>
+          <strong>{locationName}</strong>
+          <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+            [{latLon.lat.toFixed(4)}, {latLon.lon.toFixed(4)}]
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <button
+            type="button"
+            className="mini-btn"
+            onClick={detectGps}
+            disabled={isDetectingGps}
+            style={{ display: "flex", alignItems: "center", gap: "5px" }}
+          >
+            <SatelliteIcon size={13} />
+            {isDetectingGps ? "Detecting..." : "GPS Auto-Detect"}
+          </button>
+          <button
+            type="button"
+            className="mini-btn"
+            onClick={() => setShowLocationPicker((prev) => !prev)}
+            style={{ display: "flex", alignItems: "center", gap: "4px" }}
+          >
+            <MapIcon size={13} /> Change Region {showLocationPicker ? <ChevronUpIcon size={12} /> : <ChevronDownIcon size={12} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Regional District Selector */}
+      {showLocationPicker && (
+        <div style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "8px",
+          padding: "0.6rem 0.85rem",
+          marginBottom: "1rem",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.4rem"
+        }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginRight: "4px" }}>
+            Select District:
+          </span>
+          {Object.entries(MAHARASHTRA_DISTRICTS).map(([key, d]) => (
+            <button
+              key={key}
+              type="button"
+              className="mini-btn"
+              style={{
+                background: locationName.toLowerCase().includes(key) ? "rgba(37,99,235,0.12)" : "#ffffff",
+                borderColor: locationName.toLowerCase().includes(key) ? "#2563eb" : "#cbd5e1",
+                color: locationName.toLowerCase().includes(key) ? "#1d4ed8" : "#334155",
+                fontWeight: locationName.toLowerCase().includes(key) ? 700 : 500
+              }}
+              onClick={() => {
+                setLatLon({ lat: d.lat, lon: d.lon });
+                setLocationName(d.name);
+                setShowLocationPicker(false);
+              }}
+            >
+              {d.name.split(",")[0]}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="two-col">
         {/* Left Column: Upload & Trap Counters */}
         <div>
           {!preview ? (
             <div className="upload-zone" onClick={() => fileRef.current?.click()}>
-              <div className="upload-icon">🦗</div>
+              <div className="upload-icon">
+                <PestIcon size={38} color="#059669" />
+              </div>
               <p><strong>Upload pest or trap photo</strong></p>
               <p className="text-muted mt-1">Clear photo of insect on leaf, or photo of sticky trap card</p>
             </div>
@@ -188,7 +387,7 @@ export default function PestTab() {
                 className="preview-remove"
                 onClick={() => { setPreview(null); setImage(null); setResult(null); }}
               >
-                ✕
+                <CloseIcon size={16} />
               </button>
             </div>
           )}
@@ -203,14 +402,14 @@ export default function PestTab() {
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
             <button
               className="btn btn-primary btn-lg"
-              style={{ flex: 1 }}
+              style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               onClick={analyze}
               disabled={loading || !image}
             >
-              {loading ? <><span className="spinner" /> Analyzing...</> : "🦗 Detect Pest & ETL"}
+              {loading ? <><span className="spinner" /> Analyzing...</> : <><PestIcon size={16} /> Detect Pest &amp; ETL</>}
             </button>
-            <button className="btn btn-secondary btn-lg" onClick={openCamera}>
-              🤳 Live Camera
+            <button className="btn btn-secondary btn-lg" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }} onClick={openCamera}>
+              <CameraIcon size={16} /> Live Camera
             </button>
           </div>
 
@@ -223,14 +422,18 @@ export default function PestTab() {
 
           {/* Multi-Day Trap Trajectory Inputs */}
           <div className="card mt-2">
-            <div className="card-title">📈 Multi-Day Trap Trajectory Tracker</div>
+            <div className="card-title" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <TrendingUpIcon size={16} color="var(--primary)" /> Multi-Day Trap Trajectory Tracker
+            </div>
             <p className="text-muted" style={{ fontSize: "0.76rem", marginBottom: "0.75rem" }}>
               Enter trap counts from previous scouting days to calculate infestation growth velocity
             </p>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
               <div>
-                <label className="form-label" style={{ fontSize: "0.75rem" }}>🗓️ 7 Days Ago</label>
+                <label className="form-label" style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <CalendarIcon size={13} /> 7 Days Ago
+                </label>
                 <div className="pest-counter-row" style={{ marginTop: 0 }}>
                   <input
                     className="counter-input"
@@ -244,7 +447,9 @@ export default function PestTab() {
               </div>
 
               <div>
-                <label className="form-label" style={{ fontSize: "0.75rem" }}>🗓️ 3 Days Ago</label>
+                <label className="form-label" style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <CalendarIcon size={13} /> 3 Days Ago
+                </label>
                 <div className="pest-counter-row" style={{ marginTop: 0 }}>
                   <input
                     className="counter-input"
@@ -258,8 +463,8 @@ export default function PestTab() {
               </div>
 
               <div>
-                <label className="form-label" style={{ fontSize: "0.75rem", color: "var(--green-dark)", fontWeight: 700 }}>
-                  📍 Today's Count
+                <label className="form-label" style={{ fontSize: "0.75rem", color: "var(--green-dark)", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                  <LocationPinIcon size={13} color="var(--green-dark)" /> Today's Count
                 </label>
                 <div className="pest-counter-row" style={{ marginTop: 0 }}>
                   <input
@@ -276,9 +481,15 @@ export default function PestTab() {
 
             {past3d > 0 && count > 0 && (
               <div style={{ marginTop: "0.6rem", fontSize: "0.8rem", color: growthDelta > 0 ? "var(--red)" : "var(--green-mid)" }}>
-                {growthDelta > 0
-                  ? `📈 Population increased by +${growthDelta} insects over the last 3 days`
-                  : `📉 Population stabilized or decreased by ${Math.abs(growthDelta)} insects`}
+                {growthDelta > 0 ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <TrendingUpIcon size={14} color="var(--red)" /> Population increased by +{growthDelta} insects over the last 3 days
+                  </span>
+                ) : (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <TrendingDownIcon size={14} color="var(--green-mid)" /> Population stabilized or decreased by {Math.abs(growthDelta)} insects
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -286,7 +497,9 @@ export default function PestTab() {
           {/* Target Crop Selection */}
           <div className="card mt-2">
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">🌱 Target Crop (Configures ETL Limit)</label>
+              <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <LeafIcon size={15} color="var(--primary)" /> Target Crop (Configures ETL Limit)
+              </label>
               <select className="form-input" value={crop} onChange={(e) => setCrop(e.target.value)}>
                 {["Tomato", "Cotton", "Wheat", "Rice", "Sugarcane", "Onion", "Chilli", "Potato", "Okra", "Maize"].map((c) => (
                   <option key={c}>{c}</option>
@@ -312,11 +525,143 @@ export default function PestTab() {
                 )}
               </div>
 
+              {/* Expert Validation & HITL Alert for Pests */}
+              {((result.pest?.confidence && result.pest.confidence < 0.75) || result.infestation?.isEtlExceeded || escalatedCaseRef || result.expertValidation?.enqueued) && (
+                <div style={{
+                  background: "linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)",
+                  border: "1.5px solid #f97316",
+                  borderRadius: "10px",
+                  padding: "0.75rem 1rem",
+                  marginBottom: "0.85rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.6rem"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <ExpertIcon size={20} color="#9a3412" />
+                    <div>
+                      <div style={{ fontWeight: 800, color: "#9a3412", fontSize: "0.88rem" }}>
+                        {escalatedCaseRef || result.expertValidation?.caseNumber
+                          ? `Enqueued for Agronomist Review (${escalatedCaseRef || result.expertValidation?.caseNumber})`
+                          : "Borderline Pest Identification — Escalated to Agronomist"}
+                      </div>
+                      <div style={{ color: "#7c2d12", fontSize: "0.78rem" }}>
+                        Active Learning: Ground-truth verification active to confirm species morphology and ETL threshold.
+                      </div>
+                    </div>
+                  </div>
+                  {onNavigateToExpert && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onNavigateToExpert}
+                      style={{
+                        padding: "0.38rem 0.85rem",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                        background: "#ea580c",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px"
+                      }}
+                    >
+                      <ExpertIcon size={14} color="#ffffff" /> View in Expert Queue &rarr;
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* PostGIS Pest Outbreak Sync Card */}
+              <div style={{
+                background: "linear-gradient(90deg, #faf5ff 0%, #f5f3ff 100%)",
+                border: "1.5px solid #c4b5fd",
+                borderRadius: "10px",
+                padding: "0.75rem 1rem",
+                marginBottom: "0.85rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.6rem"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <PestIcon size={20} color="#6d28d9" />
+                  <div>
+                    <div style={{ fontWeight: 800, color: "#6d28d9", fontSize: "0.88rem" }}>
+                      Recorded in PostGIS Pest Surveillance
+                    </div>
+                    <div style={{ color: "#475569", fontSize: "0.8rem" }}>
+                      Trap coordinates: <strong>[{latLon.lat.toFixed(4)}, {latLon.lon.toFixed(4)}]</strong> · {locationName}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                  {onNavigateToMap && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={onNavigateToMap}
+                      style={{ padding: "0.4rem 0.85rem", fontSize: "0.82rem", fontWeight: 700, background: "#7c3aed", borderColor: "#7c3aed", display: "inline-flex", alignItems: "center", gap: "5px" }}
+                    >
+                      <MapIcon size={14} color="#ffffff" /> View on GIS Outbreak Map &rarr;
+                    </button>
+                  )}
+                  {onNavigateToExpert && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onNavigateToExpert}
+                      style={{
+                        padding: "0.4rem 0.85rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        color: "#7e22ce",
+                        background: "rgba(147,51,234,0.08)",
+                        border: "1.5px solid #a855f7",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px"
+                      }}
+                    >
+                      <ExpertIcon size={14} color="#7e22ce" /> Agronomist Queue &rarr;
+                    </button>
+                  )}
+                  {!escalatedCaseRef && !result.expertValidation?.enqueued && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={escalatePestToExpert}
+                      disabled={isEscalating}
+                      style={{
+                        padding: "0.4rem 0.85rem",
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        color: "#0369a1",
+                        background: "rgba(2,132,199,0.08)",
+                        border: "1.5px solid #38bdf8",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px"
+                      }}
+                    >
+                      <MicroscopeIcon size={14} />
+                      {isEscalating ? "Escalating..." : "Request Agronomist Second Opinion"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* ETL Alert Status */}
               {etl && (
                 <div className={`etl-alert ${alertColor} mb-2`}>
                   <div className="etl-alert-icon">
-                    {ratio >= 1 ? "⚠️" : "✅"}
+                    {ratio >= 1 ? <AlertTriangleIcon size={22} color="#ea580c" /> : <CheckCircleIcon size={22} color="#059669" />}
                   </div>
                   <div>
                     <strong>
@@ -324,12 +669,12 @@ export default function PestTab() {
                     </strong>
                     <div style={{ marginTop: "0.25rem" }}>
                       {ratio >= 2
-                        ? "🚨 Population is far above economic threshold! Immediate chemical or biological intervention recommended."
+                        ? "Population is far above economic threshold! Immediate chemical or biological intervention recommended."
                         : ratio >= 1
-                        ? "⚠️ Trap count reached scientific threshold limit. Apply targeted spray within 24–48 hours."
+                        ? "Trap count reached scientific threshold limit. Apply targeted spray within 24–48 hours."
                         : ratio >= 0.75
-                        ? "🟡 Approaching economic threshold. Increase trap scouting frequency."
-                        : "✅ Population is below damage threshold. No chemical spray required at this stage."}
+                        ? "Approaching economic threshold. Increase trap scouting frequency."
+                        : "Population is below damage threshold. No chemical spray required at this stage."}
                     </div>
                   </div>
                 </div>
@@ -338,7 +683,9 @@ export default function PestTab() {
               {/* Voice Readout Player Card */}
               <div className="voice-readout-card mb-2">
                 <div className="voice-title-group">
-                  <span className="voice-icon">🔊</span>
+                  <span className="voice-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+                    <VolumeIcon size={18} color="var(--primary)" />
+                  </span>
                   <div>
                     <strong>Pest Advisory Audio</strong>
                     <p>Listen to control steps out loud</p>
@@ -360,7 +707,7 @@ export default function PestTab() {
                     onClick={toggleAudio}
                     style={{ padding: "0.4rem 0.8rem", fontSize: "0.82rem" }}
                   >
-                    {isPlayingAudio ? "⏹️ Stop" : "▶️ Play"}
+                    {isPlayingAudio ? "Stop" : "Play"}
                   </button>
                 </div>
               </div>
@@ -370,31 +717,31 @@ export default function PestTab() {
                 <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.75rem", borderBottom: "1px solid var(--border-soft)", paddingBottom: "0.5rem" }}>
                   <button
                     className={`btn ${activeIpmTab === "bio" ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}
+                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
                     onClick={() => setActiveIpmTab("bio")}
                   >
-                    🌿 Biological
+                    <LeafIcon size={14} /> Biological
                   </button>
                   <button
                     className={`btn ${activeIpmTab === "chem" ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}
+                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
                     onClick={() => setActiveIpmTab("chem")}
                   >
-                    🧪 Chemical
+                    <FlaskIcon size={14} /> Chemical
                   </button>
                   <button
                     className={`btn ${activeIpmTab === "prev" ? "btn-primary" : "btn-secondary"}`}
-                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem" }}
+                    style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
                     onClick={() => setActiveIpmTab("prev")}
                   >
-                    🛡️ Cultural
+                    <ShieldIcon size={14} /> Cultural
                   </button>
                 </div>
 
                 {activeIpmTab === "bio" && (
                   <div>
-                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--green-dark)" }}>
-                      🌿 Organic &amp; Biological Control
+                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--green-dark)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <LeafIcon size={16} color="var(--green-dark)" /> Organic &amp; Biological Control
                     </h4>
                     <ul className="advice-list">
                       {(result.biologicalControl && result.biologicalControl.length > 0
@@ -409,8 +756,8 @@ export default function PestTab() {
 
                 {activeIpmTab === "chem" && (
                   <div>
-                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--orange)" }}>
-                      🧪 CIB&amp;RC Approved Insecticide Interventions
+                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--orange)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <FlaskIcon size={16} color="var(--orange)" /> CIB&amp;RC Approved Insecticide Interventions
                     </h4>
                     <ul className="advice-list orange">
                       {(result.chemicalControl && result.chemicalControl.length > 0
@@ -425,8 +772,8 @@ export default function PestTab() {
 
                 {activeIpmTab === "prev" && (
                   <div>
-                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--blue)" }}>
-                      🛡️ Cultural &amp; Preventive Measures
+                    <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--blue)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <ShieldIcon size={16} color="var(--blue)" /> Cultural &amp; Preventive Measures
                     </h4>
                     <ul className="advice-list blue">
                       {((result.prevention && result.prevention.length > 0 ? result.prevention : (result.preventiveMeasures && result.preventiveMeasures.length > 0 ? result.preventiveMeasures : null)) ||
@@ -441,7 +788,9 @@ export default function PestTab() {
             </div>
           ) : (
             <div className="card" style={{ textAlign: "center", padding: "3.5rem 1rem" }}>
-              <div style={{ fontSize: "2.8rem", marginBottom: "0.5rem" }}>🦗</div>
+              <div style={{ marginBottom: "0.5rem", color: "var(--primary)", display: "flex", justifyContent: "center" }}>
+                <PestIcon size={48} />
+              </div>
               <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)" }}>Ready for Pest Inspection</h3>
               <p className="text-muted mt-1" style={{ maxWidth: "380px", margin: "0.4rem auto 0" }}>
                 Upload an insect or sticky trap photo to determine pest classification, trap density, and Economic Threshold Limits.
@@ -457,8 +806,8 @@ export default function PestTab() {
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <video ref={videoRef} className="modal-video" autoPlay playsInline />
             <div className="modal-controls">
-              <button className="btn btn-primary btn-lg" onClick={snapPhoto}>
-                📸 Capture Pest Photo
+              <button className="btn btn-primary btn-lg" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }} onClick={snapPhoto}>
+                <CameraIcon size={16} /> Capture Pest Photo
               </button>
               <button className="btn btn-danger" onClick={closeCamera}>
                 Cancel

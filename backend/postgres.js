@@ -13,7 +13,7 @@ const poolConfig = process.env.DATABASE_URL
             : { rejectUnauthorized: false },
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000
+        connectionTimeoutMillis: 25000
     }
     : {
         user: process.env.PG_USER || "postgres",
@@ -23,7 +23,7 @@ const poolConfig = process.env.DATABASE_URL
         port: parseInt(process.env.PG_PORT || "5432", 10),
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000
+        connectionTimeoutMillis: 25000
     };
 
 const pool = new Pool(poolConfig);

@@ -1,4 +1,12 @@
-﻿import { useState } from "react";
+import { useState } from "react";
+import {
+  ForecastIcon,
+  LeafIcon,
+  ThermometerIcon,
+  PestIcon,
+  ClipboardListIcon
+} from "./Icons";
+
 const API = "";
 
 function RiskBar({ label, score, level }) {
@@ -74,14 +82,16 @@ export default function ForecastTab() {
   return (
     <div>
       <div className="section-header">
-        <h2>🔮 Risk Forecast</h2>
+        <h2><ForecastIcon size={22} style={{ marginRight: "8px", verticalAlign: "middle" }} /> Risk Forecast</h2>
         <p>Predict disease &amp; pest risk for the next 1–7 days based on weather, crop stage, and field history</p>
       </div>
 
       <div className="two-col">
         <div>
           <div className="card mb-2">
-            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0 }}>🌾 Crop Details</div>
+            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0, display: "flex", alignItems: "center", gap: "6px" }}>
+              <LeafIcon size={15} color="var(--primary)" /> Crop Details
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Crop</label>
@@ -111,7 +121,9 @@ export default function ForecastTab() {
           </div>
 
           <div className="card mb-2">
-            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0 }}>🌡️ Weather Conditions</div>
+            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0, display: "flex", alignItems: "center", gap: "6px" }}>
+              <ThermometerIcon size={15} color="#0284c7" /> Weather Conditions
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Temperature (°C)</label>
@@ -133,7 +145,9 @@ export default function ForecastTab() {
           </div>
 
           <div className="card mb-2">
-            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0 }}>🦗 Pest Count (in traps)</div>
+            <div className="card-title mb-1" style={{ fontSize:"0.82rem", fontWeight:600, color:"var(--text)", textTransform:"none", letterSpacing:0, display: "flex", alignItems: "center", gap: "6px" }}>
+              <PestIcon size={15} color="#d97706" /> Pest Count (in traps)
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Aphids</label>
@@ -156,8 +170,8 @@ export default function ForecastTab() {
           </div>
 
           <div style={{ display:"flex", gap:"0.5rem" }}>
-            <button className="btn btn-primary btn-lg" style={{ flex:1 }} onClick={() => runForecast(false)} disabled={loading}>
-              {loading ? <><span className="spinner" />Forecasting…</> : "🔮 Run Forecast"}
+            <button className="btn btn-primary btn-lg" style={{ flex:1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }} onClick={() => runForecast(false)} disabled={loading}>
+              {loading ? <><span className="spinner" />Forecasting…</> : <><ForecastIcon size={16} /> Run Forecast</>}
             </button>
             <button className="btn btn-secondary" onClick={() => runForecast(true)} disabled={loading}>Demo</button>
           </div>
@@ -180,14 +194,16 @@ export default function ForecastTab() {
 
               {/* Sub-risk bars */}
               <div className="card mb-2">
-                <RiskBar label="🦠 Disease Risk" score={result.diseaseRisk?.score} level={result.diseaseRisk?.level} />
-                <RiskBar label="🦗 Pest Risk"    score={result.pestRisk?.score}    level={result.pestRisk?.level} />
+                <RiskBar label="Disease Risk" score={result.diseaseRisk?.score} level={result.diseaseRisk?.level} />
+                <RiskBar label="Pest Risk"    score={result.pestRisk?.score}    level={result.pestRisk?.level} />
               </div>
 
               {/* Advisory */}
               {result.advisory?.length > 0 && (
                 <div className="advice-section">
-                  <h3>📋 Advisory</h3>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <ClipboardListIcon size={18} color="var(--primary)" /> Advisory
+                  </h3>
                   <ul className="advice-list">
                     {result.advisory.map((a, i) => <li key={i}>{a}</li>)}
                   </ul>
@@ -201,7 +217,9 @@ export default function ForecastTab() {
             </div>
           ) : (
             <div className="card" style={{ textAlign:"center", padding:"3rem 1rem" }}>
-              <div style={{ fontSize:"2.5rem", marginBottom:"0.5rem" }}>🔮</div>
+              <div style={{ marginBottom:"0.5rem", color: "var(--primary)", display: "flex", justifyContent: "center" }}>
+                <ForecastIcon size={48} />
+              </div>
               <div style={{ fontWeight:600, marginBottom:"0.4rem" }}>Risk Forecast</div>
               <div className="text-muted">Fill in the form and click Run Forecast to see the risk prediction for your crop.</div>
             </div>

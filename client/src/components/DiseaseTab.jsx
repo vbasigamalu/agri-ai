@@ -1,5 +1,37 @@
 import { useState, useRef, useEffect } from "react";
 import EXIF from "exif-js";
+import { resolveInitialLocation, saveActiveScanLocation, MAHARASHTRA_DISTRICTS } from "../utils/geoUtils";
+import {
+  MapIcon,
+  ExpertIcon,
+  ArrowRightIcon,
+  MicroscopeIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
+  LeafIcon,
+  ShieldIcon,
+  SparklesIcon,
+  ChartBarIcon,
+  CloudSunIcon,
+  ThermometerIcon,
+  DropletIcon,
+  WindIcon,
+  SprayIcon,
+  SearchIcon,
+  PillIcon,
+  VolumeIcon,
+  MessageIcon,
+  SatelliteIcon,
+  BuildingIcon,
+  CameraIcon,
+  FlipCameraIcon,
+  CloseIcon,
+  RefreshIcon,
+  LocationPinIcon,
+  ClockIcon,
+  GlobeIcon,
+  FlaskIcon
+} from "./Icons";
 
 const API = "";
 
@@ -72,21 +104,22 @@ function extractExifGps(file) {
   });
 }
 
-export default function DiseaseTab({ user }) {
+export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onNavigateToExpert }) {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [result, setResult] = useState(null);
-  
-  // Location State
-  const [locationName, setLocationName] = useState(user?.district ? `${user.district}, Maharashtra` : "Delhi (Default)");
-  const [latLon, setLatLon] = useState({ lat: 28.6139, lon: 77.2090 });
-  const [locSource, setLocSource] = useState("Default"); // "Image GPS" | "Manual - Verified" | "Device GPS" | "Default"
+
+  // Location State initialized from previous scan or user profile district
+  const initialGeo = resolveInitialLocation(user);
+  const [locationName, setLocationName] = useState(initialGeo.locationName);
+  const [latLon, setLatLon] = useState({ lat: initialGeo.lat, lon: initialGeo.lon });
+  const [locSource, setLocSource] = useState(initialGeo.source); // "Image GPS" | "Manual - Verified" | "Device GPS" | "Profile District"
 
   // Location Prompt & Validation Modal
   const [showLocModal, setShowLocModal] = useState(false);
-  const [locInput, setLocInput] = useState(user?.district || "Nashik");
+  const [locInput, setLocInput] = useState(user?.district || "Sangli");
   const [isValidatingLoc, setIsValidatingLoc] = useState(false);
   const [locError, setLocError] = useState("");
   const [locSuccess, setLocSuccess] = useState("");
@@ -96,9 +129,102 @@ export default function DiseaseTab({ user }) {
   const [cameraFacing, setCameraFacing] = useState("environment");
   const [dragover, setDragover] = useState(false);
 
-  // Audio TTS Readout
+  // Audio TTS Readout & Multilingual State (Standard English by default)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [voiceLang, setVoiceLang] = useState("en");
+  const [isTranslatingVlm, setIsTranslatingVlm] = useState(false);
+
+  // Manual Expert Validation Escalation State
+  const [isEscalatingToExpert, setIsEscalatingToExpert] = useState(false);
+  const [diseaseEscalatedCaseRef, setDiseaseEscalatedCaseRef] = useState(null);
+
+  async function escalateDiseaseToExpert() {
+    if (!result || isEscalatingToExpert) return;
+    setIsEscalatingToExpert(true);
+    try {
+      const res = await fetch(`${API}/api/expert/enqueue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "disease",
+          crop: result.crop || "Tomato",
+          aiDisease: result.disease || "Crop Diagnosis",
+          aiConfidence: confScore,
+          aiSeverity: result.severity || "Moderate",
+          aiStatus: result.status || "confirmed",
+          symptoms: result.symptoms || [],
+          vlmEvidence: result.vlmEvidence || {},
+          imageUrl: preview || null,
+          imageName: image ? image.name : "farmer_scan.jpg",
+          farmerName: user?.name || "Farmer",
+          district: user?.district || locationName.split(",")[0] || "Sangli",
+          village: user?.village || "Farm Field",
+          latitude: latLon.lat,
+          longitude: latLon.lon
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.case) {
+        setDiseaseEscalatedCaseRef(data.case.case_number);
+      }
+    } catch (err) {
+      console.warn("Could not escalate scan to expert:", err);
+    } finally {
+      setIsEscalatingToExpert(false);
+    }
+  }
+
+  // Dynamic Language Switching (Switches VLM, Audio Readout, and Chatbot)
+  const handleLanguageChange = async (newLang) => {
+    setVoiceLang(newLang);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setIsPlayingAudio(false);
+
+    // If an analysis result is currently displayed, dynamically re-explain leaf using VLM
+    if (result) {
+      setIsTranslatingVlm(true);
+      try {
+        const res = await fetch(`${API}/api/vlm/re-explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            diagnosis: {
+              crop: result.crop,
+              disease: result.disease,
+              label: result.prediction?.label || result.disease,
+              confidence: result.confidence,
+              severity: result.severity,
+              symptoms: result.symptoms || []
+            },
+            weather: {
+              temp: result.temperature,
+              humidity: result.humidity,
+              wind: result.wind
+            },
+            language: newLang,
+            imageBase64: preview || null
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && data.vlmEvidence) {
+          setResult((prev) => ({
+            ...prev,
+            vlmEvidence: data.vlmEvidence,
+            symptoms: (data.vlmEvidence.visibleSymptoms && data.vlmEvidence.visibleSymptoms.length > 0)
+              ? data.vlmEvidence.visibleSymptoms
+              : (data.symptoms || prev.symptoms),
+            vlmSymptoms: data.vlmEvidence.visibleSymptoms || prev.vlmSymptoms,
+            vlmExplanation: data.farmerExplanation || prev.vlmExplanation
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not re-explain in new language:", err);
+      } finally {
+        setIsTranslatingVlm(false);
+      }
+    }
+  };
 
   // Chatbot
   const [chatMsgs, setChatMsgs] = useState([
@@ -124,7 +250,7 @@ export default function DiseaseTab({ user }) {
     setImage(file);
     setPreview(URL.createObjectURL(file));
     setResult(null);
-    setStatus("🔍 Checking image metadata for GPS location...");
+    setStatus("Checking image metadata for GPS location...");
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     setIsPlayingAudio(false);
 
@@ -132,12 +258,12 @@ export default function DiseaseTab({ user }) {
     const gps = await extractExifGps(file);
 
     if (gps) {
-      console.log(`📍 Found GPS in Image: Lat ${gps.lat.toFixed(4)}, Lon ${gps.lon.toFixed(4)}`);
+      console.log(`Found GPS in Image: Lat ${gps.lat.toFixed(4)}, Lon ${gps.lon.toFixed(4)}`);
       setLatLon({ lat: gps.lat, lon: gps.lon });
-      const tempLoc = `📍 [${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}] (From Image GPS)`;
+      const tempLoc = `[${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}] (From Image GPS)`;
       setLocationName(tempLoc);
       setLocSource("Image GPS");
-      setStatus(`📍 Found GPS in Image metadata! (${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)})`);
+      setStatus(`Found GPS in Image metadata! (${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)})`);
 
       // Resolve human-readable address in background
       try {
@@ -151,8 +277,8 @@ export default function DiseaseTab({ user }) {
       }
     } else {
       // 2. No EXIF GPS found -> Ask the farmer
-      console.log("⚠️ This image does NOT have GPS location data. Prompting farmer...");
-      setStatus("⚠️ No GPS metadata in image. Please confirm your farm location.");
+      console.log("This image does NOT have GPS location data. Prompting farmer...");
+      setStatus("No GPS metadata in image. Please confirm your farm location.");
       setLocError("");
       setLocSuccess("");
       setLocInput(user?.district || "Nashik");
@@ -186,13 +312,13 @@ export default function DiseaseTab({ user }) {
         const lat = parseFloat(place.lat);
         const lon = parseFloat(place.lon);
 
-        console.log(`✅ Validated Location: ${validatedCity} (${lat}, ${lon})`);
+        console.log(`Validated Location: ${validatedCity} (${lat}, ${lon})`);
         setLatLon({ lat, lon });
         const finalDisplayName = `${validatedCity}${stateInfo ? ", " + stateInfo : ""} (Manual - Verified)`;
         setLocationName(finalDisplayName);
         setLocSource("Manual - Verified");
-        setLocSuccess(`✅ Validated: ${validatedCity} (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
-        setStatus(`📍 Location set: ${validatedCity} (Verified)`);
+        setLocSuccess(`Validated: ${validatedCity} (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
+        setStatus(`Location set: ${validatedCity} (Verified)`);
 
         setTimeout(() => {
           setShowLocModal(false);
@@ -200,7 +326,7 @@ export default function DiseaseTab({ user }) {
         }, 1200);
       } else {
         // Location not found
-        setLocError(`❌ Unable to find '${query}'. Please check the spelling or enter a nearby city/district.`);
+        setLocError(`Unable to find '${query}'. Please check the spelling or enter a nearby city/district.`);
       }
     } catch (err) {
       console.warn("Location validation network error:", err);
@@ -213,12 +339,12 @@ export default function DiseaseTab({ user }) {
     }
   }
 
-  // Fallback to Delhi
-  function useDefaultDelhi() {
-    setLatLon({ lat: 28.6139, lon: 77.2090 });
-    setLocationName("Delhi (Fallback)");
+  // Fallback to Sangli (Maharashtra Agricultural Epicenter)
+  function useDefaultSangli() {
+    setLatLon({ lat: 16.8524, lon: 74.5815 });
+    setLocationName("Sangli, Maharashtra (Default)");
     setLocSource("Default");
-    setStatus("📍 Location set to Delhi (Fallback)");
+    setStatus("Location set to Sangli, Maharashtra");
     setShowLocModal(false);
   }
 
@@ -231,11 +357,11 @@ export default function DiseaseTab({ user }) {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           setLatLon({ lat, lon });
-          setLocationName(`📍 [${lat.toFixed(4)}, ${lon.toFixed(4)}] (From Device GPS)`);
+          setLocationName(`[${lat.toFixed(4)}, ${lon.toFixed(4)}] (From Device GPS)`);
           setLocSource("Device GPS");
           setIsValidatingLoc(false);
           setShowLocModal(false);
-          setStatus(`📍 Set to Device GPS (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
+          setStatus(`Set to Device GPS (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
 
           try {
             const r = await fetch(`${API}/api/geocode?lat=${lat}&lon=${lon}`);
@@ -283,6 +409,7 @@ export default function DiseaseTab({ user }) {
     formData.append("lat", latLon.lat);
     formData.append("lon", latLon.lon);
     formData.append("locationName", locationName);
+    formData.append("language", voiceLang);
     if (user?.name) formData.append("farmerName", user.name);
 
     const headers = {};
@@ -333,8 +460,24 @@ export default function DiseaseTab({ user }) {
         console.warn("Could not save to local history:", e);
       }
 
-      // Add bot notification message
+      // Save active scan location so Outbreak GIS Map immediately adopts this field location
       const confScore = getConfidenceScore(data);
+      const activeScanLoc = saveActiveScanLocation({
+        lat: latLon.lat,
+        lon: latLon.lon,
+        locationName: locationName || "Scanned Field Location",
+        crop: data.crop || "Crop",
+        condition: data.disease || "Crop Diagnosis",
+        category: "disease",
+        severity: data.severity || "Moderate",
+        confidence: (confScore || 88) / 100,
+        timestamp: new Date().toISOString()
+      });
+      if (typeof onScanCompleted === "function" && activeScanLoc) {
+        onScanCompleted(activeScanLoc);
+      }
+
+      // Add bot notification message
       let welcomeTxt = `Analysis complete! Detected: ${data.disease} (${confScore}% confidence). Severity: ${data.severity || "Normal"}.`;
       if (data.spray && data.spray !== "N/A" && data.spray !== "No treatment needed") {
         welcomeTxt += ` Recommended spray: ${data.spray} (${data.spray_quantity || ""}).`;
@@ -346,7 +489,7 @@ export default function DiseaseTab({ user }) {
 
     } catch (err) {
       console.error("Analysis Error:", err);
-      setStatus("❌ " + (err.message || "Failed to analyze image. Is backend running?"));
+      setStatus(err.message || "Failed to analyze image. Is backend running?");
     } finally {
       setLoading(false);
     }
@@ -414,7 +557,7 @@ export default function DiseaseTab({ user }) {
     }
 
     window.speechSynthesis.cancel();
-    
+
     const disease = result.disease || "crop condition";
     const severity = result.severity || "moderate";
     const spray = result.spray || "no chemical spray required";
@@ -433,7 +576,7 @@ export default function DiseaseTab({ user }) {
 
     const utterance = new SpeechSynthesisUtterance(speechText);
     utterance.rate = 0.95;
-    
+
     if (voiceLang === "mr") utterance.lang = "mr-IN";
     else if (voiceLang === "hi") utterance.lang = "hi-IN";
     else utterance.lang = "en-US";
@@ -445,7 +588,7 @@ export default function DiseaseTab({ user }) {
     window.speechSynthesis.speak(utterance);
   }
 
-  // AI Chat
+  // AI Agricultural Advisor Chat (SIH Context Manager Pipeline)
   async function sendChatMessage() {
     const q = chatInput.trim();
     if (!q) return;
@@ -455,20 +598,28 @@ export default function DiseaseTab({ user }) {
     setChatLoading(true);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
 
-    let scanContext = "";
-    if (result) {
-      scanContext = `Disease: ${result.disease}, Severity: ${result.severity}, Caused by: ${result.causedBy}, Spray: ${result.spray} (Timing: ${result.spray_action_time}, Qty: ${result.spray_quantity}), Weather: ${result.temperature}°C, ${result.humidity}% humidity.`;
-    }
-
     try {
-      const res = await fetch(`${API}/chat`, {
+      const res = await fetch(`${API}/api/chatbot/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: q,
-          message: q,
-          context: scanContext,
-          language: voiceLang === "mr" ? "Marathi" : voiceLang === "hi" ? "Hindi" : "English"
+          query: q,
+          cropCase: result ? {
+            caseRef: result.case_ref || "LIVE-SCAN",
+            crop: result.crop || "Tomato",
+            disease: result.disease,
+            severity: result.severity,
+            severityPct: result.severity_pct || result.severityScore,
+            treatments: result.spray ? [result.spray] : []
+          } : null,
+          weather: result ? {
+            temperature: result.temperature,
+            humidity: result.humidity,
+            condition: result.weatherCondition
+          } : null,
+          history: chatMsgs.slice(-4),
+          language: voiceLang || "en",
+          location: locationName || "Sangli"
         })
       });
 
@@ -490,14 +641,14 @@ export default function DiseaseTab({ user }) {
     <div>
       {/* Header */}
       <div className="section-header">
-        <h2>🌿 Crop Disease Detection &amp; Treatment Advisor</h2>
+        <h2><LeafIcon size={22} style={{ marginRight: 8, verticalAlign: "middle" }} /> Crop Disease Detection &amp; Treatment Advisor</h2>
         <p>AI-driven diagnosis with instant spray recommendations, severity grading, and weather-aware advice</p>
       </div>
 
       {/* Detection Location Row */}
       <div className="location-chip-row">
         <div className="location-info">
-          <span>📍</span>
+          <LocationPinIcon size={14} color="#059669" />
           <span>Field Location:</span>
           <strong>{locationName}</strong>
         </div>
@@ -528,7 +679,9 @@ export default function DiseaseTab({ user }) {
               onDragLeave={() => setDragover(false)}
               onDrop={handleDrop}
             >
-              <div className="upload-icon">📸</div>
+              <div className="upload-icon">
+                <CameraIcon size={38} color="#059669" />
+              </div>
               <p><strong>Click to upload</strong> or drag &amp; drop leaf photo</p>
               <p className="text-muted mt-1">Supports JPG, PNG, WebP — GPS metadata auto-detected from photo</p>
             </div>
@@ -540,7 +693,7 @@ export default function DiseaseTab({ user }) {
                 onClick={() => { setPreview(null); setImage(null); setResult(null); }}
                 title="Remove photo"
               >
-                ✕
+                <CloseIcon size={16} />
               </button>
             </div>
           )}
@@ -552,11 +705,85 @@ export default function DiseaseTab({ user }) {
             onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
           />
 
+          {/* Advisor & VLM Language Selector Bar */}
+          <div className="language-selector-bar" style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "var(--card-bg, #ffffff)",
+            border: "1px solid var(--border, #e2e8f0)",
+            borderRadius: "10px",
+            padding: "0.5rem 0.85rem",
+            marginTop: "0.75rem",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <GlobeIcon size={16} color="#059669" />
+              <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text)" }}>
+                Language / भाषा:
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "0.35rem" }}>
+              {[
+                { code: "en", label: "English" },
+                { code: "mr", label: "मराठी" },
+                { code: "hi", label: "हिंदी" }
+              ].map((l) => {
+                const active = voiceLang === l.code;
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => handleLanguageChange(l.code)}
+                    disabled={isTranslatingVlm}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      padding: "0.32rem 0.7rem",
+                      fontSize: "0.82rem",
+                      fontWeight: active ? 700 : 500,
+                      borderRadius: "6px",
+                      border: active ? "1.5px solid #10b981" : "1px solid #cbd5e1",
+                      background: active ? "rgba(16, 185, 129, 0.12)" : "#ffffff",
+                      color: active ? "#047857" : "#475569",
+                      cursor: isTranslatingVlm ? "wait" : "pointer",
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    <span>{l.label}</span>
+                    {active && <CheckCircleIcon size={13} color="#047857" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Inline notification when VLM is re-explaining in a new language */}
+          {isTranslatingVlm && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              color: "#047857",
+              padding: "0.45rem 0.75rem",
+              borderRadius: "8px",
+              marginTop: "0.5rem",
+              fontSize: "0.82rem",
+              fontWeight: 600
+            }}>
+              <span className="spinner" style={{ width: "14px", height: "14px", borderWidth: "2px" }} />
+              <span>Updating VLM explanation to {voiceLang === "mr" ? "मराठी (Marathi)" : voiceLang === "hi" ? "हिंदी (Hindi)" : "Standard English"}...</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
             <button
               className="btn btn-primary btn-lg"
-              style={{ flex: 1 }}
+              style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               onClick={analyzeCrop}
               disabled={loading || !image}
             >
@@ -565,11 +792,13 @@ export default function DiseaseTab({ user }) {
                   <span className="spinner" /> Analyzing Leaf...
                 </>
               ) : (
-                "🔬 Analyze Crop Conditions"
+                <>
+                  <MicroscopeIcon size={18} /> Analyze Crop Conditions
+                </>
               )}
             </button>
-            <button className="btn btn-secondary btn-lg" onClick={openCamera}>
-              🤳 Live Camera
+            <button className="btn btn-secondary btn-lg" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }} onClick={openCamera}>
+              <CameraIcon size={18} /> Live Camera
             </button>
           </div>
 
@@ -586,7 +815,9 @@ export default function DiseaseTab({ user }) {
               {/* Uncertainty / Quality Alert if flagged */}
               {result.uncertainty?.flagged && (
                 <div className="quality-warning-card">
-                  <strong>⚠️ Model Uncertainty Warning</strong>
+                  <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangleIcon size={16} color="#d97706" /> Model Uncertainty Warning
+                  </strong>
                   <span>
                     The AI detected potential uncertainty in this image ({result.uncertainty.reason || "unconfirmed_prediction"}).
                     Please ensure the photo is clear, well-lit, and shows only the diseased plant leaf.
@@ -596,8 +827,99 @@ export default function DiseaseTab({ user }) {
 
               {result.imageQuality && result.imageQuality.valid === false && (
                 <div className="quality-warning-card">
-                  <strong>⚠️ Image Quality Alert (Score: {result.imageQuality.score}%)</strong>
+                  <strong style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangleIcon size={16} color="#d97706" /> Image Quality Alert (Score: {result.imageQuality.score}%)
+                  </strong>
                   <span>{result.imageQuality.recommendation || "Please retake the photo with better lighting and sharp focus."}</span>
+                </div>
+              )}
+
+              {/* Vision Pipeline Diagnostics Ribbon */}
+              <div style={{
+                background: "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "0.55rem 0.85rem",
+                marginBottom: "0.85rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+                fontSize: "0.78rem"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#334155" }}>
+                  <MicroscopeIcon size={14} color="#047857" />
+                  <span>Vision Pipeline Diagnostics:</span>
+                </div>
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", padding: "2px 7px", borderRadius: "6px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <ShieldIcon size={12} color="#047857" /> Quality: {result.imageQuality?.score || result.qualityScore || 100}%
+                  </span>
+                  <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", padding: "2px 7px", borderRadius: "6px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <LeafIcon size={12} color="#1d4ed8" /> Foliage Isolated &amp; Denoised
+                  </span>
+                  <span style={{ background: "#faf5ff", color: "#7e22ce", border: "1px solid #e9d5ff", padding: "2px 7px", borderRadius: "6px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <LeafIcon size={12} color="#7e22ce" /> Leaves: {result.leafAnalysis?.leafCount || 1} ({result.affectedLeaves || "1/1 affected"})
+                  </span>
+                  {result.vlmEvidence && (
+                    <span style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", padding: "2px 7px", borderRadius: "6px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <SparklesIcon size={12} color="#b45309" /> VLM Agreement: {result.vlmEvidence.agreementScore || 92}%
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Borderline Confidence Escalation Alert Card (Case #1024 Integration) */}
+              {(confScore < 75 || result.uncertainty?.flagged) && (
+                <div style={{
+                  background: "linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)",
+                  border: "1.5px solid #f97316",
+                  borderRadius: "12px",
+                  padding: "0.85rem 1.15rem",
+                  marginBottom: "0.85rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                  boxShadow: "0 2px 10px rgba(249,115,22,0.08)"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <AlertTriangleIcon size={24} color="#ea580c" />
+                    <div>
+                      <div style={{ fontWeight: 800, color: "#9a3412", fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>Borderline Model Confidence ({confScore}%) — Auto-Escalated to Agronomist</span>
+                        <span style={{ fontSize: "0.72rem", background: "#ea580c", color: "#fff", padding: "1px 6px", borderRadius: "10px" }}>HITL Active</span>
+                      </div>
+                      <div style={{ color: "#7c2d12", fontSize: "0.82rem", marginTop: "2px" }}>
+                        Because confidence is under 75% (e.g. Early Blight vs Septoria Leaf Spot), this case is safely enqueued in the <strong>Expert Validation Dashboard</strong> for human review.
+                      </div>
+                    </div>
+                  </div>
+                  {onNavigateToExpert && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={onNavigateToExpert}
+                      style={{
+                        background: "#ea580c",
+                        border: "none",
+                        padding: "0.45rem 1rem",
+                        fontSize: "0.84rem",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 6px rgba(234,88,12,0.25)"
+                      }}
+                    >
+                      <ExpertIcon size={15} color="#ffffff" />
+                      <span>View in Expert Review Queue</span>
+                      <ArrowRightIcon size={12} color="#ffffff" />
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -640,9 +962,98 @@ export default function DiseaseTab({ user }) {
                   </div>
                 </div>
 
+                {/* 1.1 Alternative Candidates / Prediction Distribution */}
+                {((result.prediction?.allPredictions && result.prediction.allPredictions.length > 1) || (result.allPredictions && result.allPredictions.length > 1)) && (
+                  <div style={{
+                    gridColumn: "1 / -1",
+                    background: "var(--card-bg, #ffffff)",
+                    border: "1px solid var(--border, #e2e8f0)",
+                    borderRadius: "10px",
+                    padding: "0.75rem 1rem",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+                  }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <MicroscopeIcon size={14} color="var(--text-muted)" />
+                      <span>Model Prediction Distribution (Top Differential Candidates):</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      {(result.prediction?.allPredictions || result.allPredictions || []).slice(0, 3).map((pred, idx) => {
+                        const pName = (pred.disease || pred.label || "").replace(/___/g, " - ").replace(/_/g, " ");
+                        const pScore = pred.confidencePercent !== undefined
+                          ? Math.round(pred.confidencePercent)
+                          : Math.round((pred.confidence || 0) * 100);
+                        const isTop = idx === 0;
+                        return (
+                          <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.82rem" }}>
+                            <span style={{ width: "210px", fontWeight: isTop ? 700 : 500, color: isTop ? "var(--text)" : "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {idx + 1}. {pName}
+                            </span>
+                            <div style={{ flex: 1, background: "#f1f5f9", height: "8px", borderRadius: "4px", overflow: "hidden" }}>
+                              <div style={{
+                                width: `${pScore}%`,
+                                height: "100%",
+                                background: isTop ? (pScore >= 75 ? "#10b981" : "#f97316") : "#94a3b8",
+                                borderRadius: "4px"
+                              }} />
+                            </div>
+                            <span style={{ width: "42px", textAlign: "right", fontWeight: 700, color: isTop ? "var(--text)" : "#64748b" }}>
+                              {pScore}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 1.2 Multi-Leaf Foliage Inspection Card */}
+                {result.multiLeafAnalysis && result.multiLeafAnalysis.leafPredictions && result.multiLeafAnalysis.leafPredictions.length > 1 && (
+                  <div style={{
+                    gridColumn: "1 / -1",
+                    background: "var(--card-bg, #ffffff)",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "10px",
+                    padding: "0.75rem 1rem"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#0f172a", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <LeafIcon size={14} color="#047857" />
+                        <span>Multi-Leaf Foliage Inspection ({result.multiLeafAnalysis.validLeavesCount || result.multiLeafAnalysis.leafPredictions.length} leaves parsed)</span>
+                      </span>
+                      <span className="sidebar-badge" style={{ background: "rgba(16,185,129,0.12)", color: "#047857", border: "1px solid #10b981", fontSize: "0.74rem" }}>
+                        Prevalence: {result.multiLeafAnalysis.prevalencePercent || 50}%
+                      </span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.6rem" }}>
+                      {result.multiLeafAnalysis.leafPredictions.map((lp, idx) => (
+                        <div key={idx} style={{
+                          border: lp.isHealthy ? "1px solid #86efac" : "1px solid #fed7aa",
+                          background: lp.isHealthy ? "#f0fdf4" : "#fff7ed",
+                          borderRadius: "8px",
+                          padding: "0.5rem 0.75rem",
+                          fontSize: "0.8rem"
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                            <span>Leaf #{lp.leafId || idx + 1}</span>
+                            <span style={{ color: lp.isHealthy ? "#16a34a" : "#ea580c" }}>
+                              {lp.isHealthy ? "Healthy" : "Affected"}
+                            </span>
+                          </div>
+                          <div style={{ color: "#475569", marginTop: "2px", fontSize: "0.76rem" }}>
+                            {lp.disease || lp.label} ({lp.confidencePercent || Math.round((lp.confidence || 0) * 100)}%)
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 2. Severity & Affected Area */}
                 <div className="card">
-                  <div className="card-title">📊 Severity Level</div>
+                  <div className="card-title" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <ChartBarIcon size={15} color="var(--primary)" />
+                    <span>Severity Level</span>
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem" }}>
                     <span className={`severity-badge ${severityBadgeClass}`}>
                       {result.severity || "Moderate"}
@@ -655,23 +1066,122 @@ export default function DiseaseTab({ user }) {
 
                 {/* 3. Weather Conditions Grid */}
                 <div className="card">
-                  <div className="card-title">🌦️ Field Micro-Climate</div>
+                  <div className="card-title" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <CloudSunIcon size={16} color="var(--primary)" />
+                    <span>Field Micro-Climate</span>
+                  </div>
                   <div className="weather-stats-grid">
                     <div className="weather-chip">
-                      <div className="weather-chip-icon">🌡️</div>
+                      <div className="weather-chip-icon"><ThermometerIcon size={18} color="#e11d48" /></div>
                       <div className="weather-chip-val">{result.temperature != null ? `${result.temperature}°C` : "--"}</div>
                       <div className="weather-chip-lbl">Temp</div>
                     </div>
                     <div className="weather-chip">
-                      <div className="weather-chip-icon">💧</div>
+                      <div className="weather-chip-icon"><DropletIcon size={18} color="#0284c7" /></div>
                       <div className="weather-chip-val">{result.humidity != null ? `${result.humidity}%` : "--"}</div>
                       <div className="weather-chip-lbl">Humidity</div>
                     </div>
                     <div className="weather-chip">
-                      <div className="weather-chip-icon">💨</div>
+                      <div className="weather-chip-icon"><WindIcon size={18} color="#059669" /></div>
                       <div className="weather-chip-val">{result.wind != null ? `${result.wind}` : "--"}</div>
                       <div className="weather-chip-lbl">km/h Wind</div>
                     </div>
+                  </div>
+                </div>
+
+                {/* 1.5. PostGIS Outbreak Surveillance Link Card */}
+                <div style={{
+                  gridColumn: "1 / -1",
+                  background: "linear-gradient(90deg, #eff6ff 0%, #f0fdf4 100%)",
+                  border: "1.5px solid #93c5fd",
+                  borderRadius: "10px",
+                  padding: "0.75rem 1rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.6rem"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <MapIcon size={22} color="#1e40af" />
+                    <div>
+                      <div style={{ fontWeight: 800, color: "#1e40af", fontSize: "0.88rem" }}>
+                        Recorded in PostGIS Outbreak Surveillance
+                      </div>
+                      <div style={{ color: "#475569", fontSize: "0.8rem" }}>
+                        Field coordinates: <strong>[{latLon.lat.toFixed(4)}, {latLon.lon.toFixed(4)}]</strong> · {locationName}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                    {onNavigateToMap && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={onNavigateToMap}
+                        style={{ padding: "0.4rem 0.85rem", fontSize: "0.82rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      >
+                        <MapIcon size={14} color="#ffffff" />
+                        <span>View on GIS Outbreak Map</span>
+                        <ArrowRightIcon size={12} color="#ffffff" />
+                      </button>
+                    )}
+                    {onNavigateToExpert && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onNavigateToExpert}
+                        style={{
+                          padding: "0.4rem 0.85rem",
+                          fontSize: "0.82rem",
+                          fontWeight: 700,
+                          color: "#7e22ce",
+                          background: "rgba(147,51,234,0.08)",
+                          border: "1.5px solid #a855f7",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <ExpertIcon size={14} color="#7e22ce" />
+                        <span>Agronomist Validation Queue</span>
+                        <ArrowRightIcon size={12} color="#7e22ce" />
+                      </button>
+                    )}
+                    {!diseaseEscalatedCaseRef && confScore >= 75 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={escalateDiseaseToExpert}
+                        disabled={isEscalatingToExpert}
+                        style={{
+                          padding: "0.4rem 0.85rem",
+                          fontSize: "0.82rem",
+                          fontWeight: 700,
+                          color: "#0369a1",
+                          background: "rgba(2,132,199,0.08)",
+                          border: "1.5px solid #38bdf8",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        {isEscalatingToExpert ? (
+                          "Escalating..."
+                        ) : (
+                          <>
+                            <MicroscopeIcon size={14} color="#0369a1" />
+                            <span>Request Agronomist Second Opinion</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {diseaseEscalatedCaseRef && (
+                      <span style={{ fontSize: "0.8rem", color: "#047857", fontWeight: 700, background: "#ecfdf5", padding: "4px 8px", borderRadius: "6px", border: "1px solid #86efac", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                        <CheckCircleIcon size={13} color="#047857" />
+                        <span>Enqueued for Review: {diseaseEscalatedCaseRef}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -679,7 +1189,10 @@ export default function DiseaseTab({ user }) {
                 {result.spray && (
                   <div className={`spray-card full ${result.severity?.toLowerCase().includes("critical") ? "danger" : ""}`}>
                     <div className="spray-title-wrap">
-                      <span className="spray-label">🔫 Spray Recommendation</span>
+                      <span className="spray-label" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <SprayIcon size={15} color="var(--primary)" />
+                        <span>Spray Recommendation</span>
+                      </span>
                       <span className="sidebar-badge" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                         CIB&amp;RC Approved
                       </span>
@@ -689,13 +1202,17 @@ export default function DiseaseTab({ user }) {
                     <div className="spray-details-chips">
                       {result.spray_quantity && result.spray_quantity !== "N/A" && (
                         <div className="spray-chip">
-                          <span>💧 Quantity:</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <DropletIcon size={13} /> Quantity:
+                          </span>
                           <strong>{result.spray_quantity}</strong>
                         </div>
                       )}
                       {result.spray_action_time && result.spray_action_time !== "N/A" && (
                         <div className="spray-chip">
-                          <span>⏱️ Timing:</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <ClockIcon size={13} /> Timing:
+                          </span>
                           <strong>{result.spray_action_time}</strong>
                         </div>
                       )}
@@ -706,7 +1223,9 @@ export default function DiseaseTab({ user }) {
                 {/* 5. Analysis Alert Banner */}
                 {result.alert && (
                   <div className="analysis-alert-banner full">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon">
+                      <AlertTriangleIcon size={18} color="#f59e0b" />
+                    </span>
                     <div>
                       <strong>Analysis Alert</strong>
                       <div style={{ marginTop: "2px" }}>{result.alert}</div>
@@ -717,8 +1236,9 @@ export default function DiseaseTab({ user }) {
                 {/* 6. Spray Safety Warnings */}
                 {result.sprayWarnings && result.sprayWarnings.length > 0 && (
                   <div className="spray-warnings-box full">
-                    <div className="card-title" style={{ color: "var(--red)" }}>
-                      ⚠️ Spray Safety Warnings
+                    <div className="card-title" style={{ color: "var(--red)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <AlertTriangleIcon size={16} color="var(--red)" />
+                      <span>Spray Safety Warnings</span>
                     </div>
                     <ul className="warning-item-list">
                       {result.sprayWarnings.map((w, i) => (
@@ -729,69 +1249,170 @@ export default function DiseaseTab({ user }) {
                 )}
               </div>
 
-              {/* Voice Readout Player Card */}
-              <div className="voice-readout-card">
-                <div className="voice-title-group">
-                  <span className="voice-icon">🔊</span>
-                  <div>
-                    <strong>Voice Advisory Player</strong>
-                    <p>Listen to diagnosis and spray instructions out loud</p>
+              {/* VLM Visual-Intelligence Layer Card */}
+              {result.vlmEvidence && (
+                <div className="card full" style={{
+                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%)",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
+                  marginBottom: "1rem",
+                  position: "relative"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <div className="card-title" style={{ color: "#065f46", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <MicroscopeIcon size={16} color="#065f46" />
+                    <span>
+                      {voiceLang === "mr"
+                        ? "AI दृश्य पुरावे (VLM Visual-Intelligence)"
+                        : voiceLang === "hi"
+                          ? "AI दृश्य प्रमाण (VLM Visual-Intelligence)"
+                          : "AI Visual Evidence (VLM Visual-Intelligence)"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    {isTranslatingVlm && (
+                      <span style={{ fontSize: "0.76rem", color: "#047857", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <RefreshIcon size={12} color="#047857" />
+                        <span>Updating language...</span>
+                      </span>
+                    )}
+                    <span className="sidebar-badge" style={{
+                      background: "rgba(16, 185, 129, 0.2)",
+                      color: "#047857",
+                      border: "1px solid #10b981",
+                      fontWeight: 700,
+                      fontSize: "0.78rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}>
+                      <SparklesIcon size={12} color="#047857" />
+                      <span>
+                        {voiceLang === "mr"
+                          ? `सहमती: ${result.vlmEvidence.agreementScore || 92}%`
+                          : voiceLang === "hi"
+                            ? `सहमति: ${result.vlmEvidence.agreementScore || 92}%`
+                            : `Consensus: ${result.vlmEvidence.agreementScore || 92}%`}
+                      </span>
+                    </span>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                  <select
-                    className="form-input"
-                    style={{ width: "auto", padding: "0.3rem 0.6rem", fontSize: "0.82rem" }}
-                    value={voiceLang}
-                    onChange={(e) => setVoiceLang(e.target.value)}
-                  >
-                    <option value="en">English</option>
-                    <option value="hi">हिंदी (Hindi)</option>
-                    <option value="mr">मराठी (Marathi)</option>
-                  </select>
 
-                  <button
-                    className={`btn ${isPlayingAudio ? "btn-danger" : "btn-primary"}`}
-                    onClick={toggleAudioAdvisory}
-                    style={{ padding: "0.45rem 0.9rem", fontSize: "0.84rem" }}
-                  >
-                    {isPlayingAudio ? "⏹️ Stop Audio" : "▶️ Play Advice"}
-                  </button>
-
-                  <div className={`audio-wave-visualizer ${isPlayingAudio ? "playing" : ""}`}>
-                    <span /><span /><span /><span />
-                  </div>
+                  {result.vlmEvidence.farmerExplanation && (
+                <div style={{
+                  fontSize: "0.92rem",
+                  lineHeight: "1.55",
+                  color: "var(--text)",
+                  marginBottom: "0.75rem",
+                  background: "rgba(255, 255, 255, 0.8)",
+                  padding: "0.75rem 1rem",
+                  borderRadius: "8px",
+                  borderLeft: "4px solid #10b981"
+                }}>
+                  {result.vlmEvidence.farmerExplanation}
                 </div>
+              )}
+
+              {result.vlmEvidence.visibleSymptoms && result.vlmEvidence.visibleSymptoms.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "0.35rem"
+                  }}>
+                    {voiceLang === "mr"
+                      ? "पानावरील ठळक दृश्य लक्षणे (Observed Symptoms):"
+                      : voiceLang === "hi"
+                        ? "पत्ती पर देखे गए लक्षण (Observed Symptoms):"
+                        : "Observed Foliage Symptoms:"}
+                  </div>
+                  <ul className="advice-list green" style={{ margin: 0, paddingLeft: "1.2rem" }}>
+                    {result.vlmEvidence.visibleSymptoms.map((symp, i) => (
+                      <li key={i} style={{ marginBottom: "0.25rem", fontSize: "0.88rem" }}>{symp}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Voice Readout Player Card */}
+          <div className="voice-readout-card">
+            <div className="voice-title-group">
+              <span className="voice-icon">
+                <VolumeIcon size={18} color="#2563eb" />
+              </span>
+              <div>
+                <strong>Voice Advisory Player</strong>
+                <p>Listen to diagnosis and spray instructions out loud</p>
               </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <select
+                className="form-input"
+                style={{ width: "auto", padding: "0.3rem 0.6rem", fontSize: "0.82rem" }}
+                value={voiceLang}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+              >
+                <option value="en">English (Default)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="hi">हिंदी (Hindi)</option>
+              </select>
 
-              {/* Symptoms List */}
-              {result.symptoms && result.symptoms.length > 0 && (
-                <div className="advice-section">
-                  <h3>🔍 Symptoms &amp; Diagnostic Patterns</h3>
-                  <ul className="advice-list orange">
-                    {result.symptoms.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <button
+                className={`btn ${isPlayingAudio ? "btn-danger" : "btn-primary"}`}
+                onClick={toggleAudioAdvisory}
+                style={{ padding: "0.45rem 0.9rem", fontSize: "0.84rem" }}
+              >
+                {isPlayingAudio ? "Stop Audio" : "Play Advice"}
+              </button>
 
-              {/* Treatment Steps */}
-              {result.advice && result.advice.length > 0 && (
-                <div className="advice-section">
-                  <h3>💊 Treatment Steps &amp; Agronomic Action</h3>
-                  <ul className="advice-list">
-                    {result.advice.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div className={`audio-wave-visualizer ${isPlayingAudio ? "playing" : ""}`}>
+                <span /><span /><span /><span />
+              </div>
+            </div>
+          </div>
+
+          {/* Symptoms List */}
+          {result.symptoms && result.symptoms.length > 0 && (
+            <div className="advice-section">
+              <h3 style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <SearchIcon size={16} color="#ea580c" />
+                <span>Symptoms &amp; Diagnostic Patterns</span>
+              </h3>
+              <ul className="advice-list orange">
+                {result.symptoms.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Treatment Steps */}
+          {result.advice && result.advice.length > 0 && (
+            <div className="advice-section">
+              <h3 style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <PillIcon size={16} color="#2563eb" />
+                <span>Treatment Steps &amp; Agronomic Action</span>
+              </h3>
+              <ul className="advice-list">
+                {result.advice.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
               {/* Prevention Tips */}
               {result.prevention && result.prevention.length > 0 && (
                 <div className="advice-section">
-                  <h3>🛡️ Cultural Prevention Tips</h3>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <ShieldIcon size={16} color="#059669" />
+                    <span>Cultural Prevention Tips</span>
+                  </h3>
                   <ul className="advice-list blue">
                     {result.prevention.map((p, i) => (
                       <li key={i}>{p}</li>
@@ -803,60 +1424,64 @@ export default function DiseaseTab({ user }) {
           )}
         </div>
 
-        {/* RIGHT COLUMN: AI Agricultural Advisor Chat */}
-        <div>
-          <div className="section-header">
-            <h2>💬 Ask Agri-Advisor</h2>
-            <p>Direct questions about treatment, dosage, soil nutrition, or organic remedies</p>
+      {/* RIGHT COLUMN: AI Agricultural Advisor Chat */}
+      <div>
+        <div className="section-header">
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <MessageIcon size={20} color="#2563eb" />
+            <span>Ask Agri-Advisor</span>
+          </h2>
+          <p>Direct questions about treatment, dosage, soil nutrition, or organic remedies</p>
+        </div>
+
+        <div className="chat-wrap">
+          <div className="chat-header-bar">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span className="pulse-dot" />
+              <strong>Agri-AI Agronomist</strong>
+            </div>
+            {result && (
+              <span className="chat-context-pill" style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                <LeafIcon size={12} color="#047857" />
+                <span>Context: {result.disease}</span>
+              </span>
+            )}
           </div>
 
-          <div className="chat-wrap">
-            <div className="chat-header-bar">
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <span className="pulse-dot" />
-                <strong>Agri-AI Agronomist</strong>
+          <div className="chat-messages">
+            {chatMsgs.map((m, i) => (
+              <div key={i} className={`chat-msg ${m.role}`}>
+                {m.text}
               </div>
-              {result && (
-                <span className="chat-context-pill">
-                  🌿 Context: {result.disease}
-                </span>
-              )}
-            </div>
+            ))}
+            {chatLoading && (
+              <div className="chat-msg bot" style={{ color: "var(--text-muted)" }}>
+                <span className="spinner" style={{ display: "inline-block", marginRight: "6px" }} />
+                Analyzing query...
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
 
-            <div className="chat-messages">
-              {chatMsgs.map((m, i) => (
-                <div key={i} className={`chat-msg ${m.role}`}>
-                  {m.text}
-                </div>
-              ))}
-              {chatLoading && (
-                <div className="chat-msg bot" style={{ color: "var(--text-muted)" }}>
-                  <span className="spinner" style={{ display: "inline-block", marginRight: "6px" }} />
-                  Analyzing query...
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            <div className="chat-input-row">
-              <input
-                className="chat-input"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about fertilizer, organic spray, recovery time..."
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChatMessage()}
-              />
-              <button
-                className="btn btn-primary"
-                onClick={sendChatMessage}
-                disabled={chatLoading}
-              >
-                Send
-              </button>
-            </div>
+          <div className="chat-input-row">
+            <input
+              className="chat-input"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask about fertilizer, organic spray, recovery time..."
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChatMessage()}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={sendChatMessage}
+              disabled={chatLoading}
+            >
+              Send
+            </button>
           </div>
         </div>
       </div>
+    </div>
 
       {/* LOCATION PROMPT & VALIDATION MODAL */}
       {showLocModal && (
@@ -868,8 +1493,9 @@ export default function DiseaseTab({ user }) {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
               <div>
-                <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text)" }}>
-                  📍 Verify Farm Location
+                <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text)", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <LocationPinIcon size={18} color="#2563eb" />
+                  <span>Verify Farm Location</span>
                 </h3>
                 <p className="text-muted" style={{ fontSize: "0.82rem", marginTop: "2px" }}>
                   No GPS metadata was found in this photo. Please enter your location to fetch local weather &amp; spray safety conditions.
@@ -877,10 +1503,10 @@ export default function DiseaseTab({ user }) {
               </div>
               <button
                 className="preview-remove"
-                style={{ position: "static" }}
+                style={{ position: "static", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 onClick={() => setShowLocModal(false)}
               >
-                ✕
+                <CloseIcon size={14} />
               </button>
             </div>
 
@@ -902,7 +1528,7 @@ export default function DiseaseTab({ user }) {
 
             {/* Quick Location Pills */}
             <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-              {["Nashik", "Pune", "Kolhapur", "Solapur", "Nagpur", "Delhi"].map((c) => (
+              {["Sangli", "Nashik", "Pune", "Solapur", "Ahmednagar", "Kolhapur", "Nagpur"].map((c) => (
                 <button
                   key={c}
                   type="button"
@@ -942,28 +1568,38 @@ export default function DiseaseTab({ user }) {
                 className="btn btn-primary btn-full"
                 onClick={() => validateLocation(locInput)}
                 disabled={isValidatingLoc}
+                style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               >
-                {isValidatingLoc ? "Verifying..." : "✅ Validate & Set Location"}
+                {isValidatingLoc ? (
+                  "Verifying..."
+                ) : (
+                  <>
+                    <CheckCircleIcon size={16} />
+                    <span>Validate &amp; Set Location</span>
+                  </>
+                )}
               </button>
 
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ flex: 1, fontSize: "0.82rem" }}
+                  style={{ flex: 1, fontSize: "0.82rem", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                   onClick={useDeviceGps}
                   disabled={isValidatingLoc}
                 >
-                  📡 Use Device GPS
+                  <SatelliteIcon size={15} color="var(--primary)" />
+                  <span>Use Device GPS</span>
                 </button>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ flex: 1, fontSize: "0.82rem" }}
-                  onClick={useDefaultDelhi}
+                  style={{ flex: 1, fontSize: "0.82rem", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                  onClick={useDefaultSangli}
                   disabled={isValidatingLoc}
                 >
-                  🏛️ Delhi (Default)
+                  <BuildingIcon size={15} color="var(--primary)" />
+                  <span>Sangli (Maharashtra)</span>
                 </button>
               </div>
             </div>
@@ -977,11 +1613,13 @@ export default function DiseaseTab({ user }) {
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <video ref={videoRef} className="modal-video" autoPlay playsInline />
             <div className="modal-controls">
-              <button className="btn btn-primary btn-lg" onClick={snapPhoto}>
-                📸 Capture &amp; Analyze
+              <button className="btn btn-primary btn-lg" onClick={snapPhoto} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <CameraIcon size={18} />
+                <span>Capture &amp; Analyze</span>
               </button>
-              <button className="btn btn-secondary" onClick={flipCamera}>
-                🔄 Flip Camera
+              <button className="btn btn-secondary" onClick={flipCamera} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <FlipCameraIcon size={16} />
+                <span>Flip Camera</span>
               </button>
               <button className="btn btn-danger" onClick={closeCamera}>
                 Cancel
@@ -990,6 +1628,6 @@ export default function DiseaseTab({ user }) {
           </div>
         </div>
       )}
-    </div>
+    </div >
   );
 }

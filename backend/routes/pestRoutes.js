@@ -16,6 +16,8 @@ const localPestStore = require("../localPestStore");
 const { detectPest } = require("../pestDetector");
 const { PEST_DATABASE, evaluateInfestation, forecastPestTrajectory } = require("../pestDatabase");
 const { optionalAuth } = require("../middleware/auth");
+const { recordSpatialReport } = require("../spatial");
+const { enqueueCase } = require("../expert");
 
 // Configure storage for uploaded pest trap images
 const uploadDir = path.join(__dirname, "../../uploads/pests");
@@ -121,6 +123,71 @@ router.post("/detect", optionalAuth, upload.single("image"), async (req, res) =>
             savedLog = localPestStore.saveLog(logPayload);
         }
 
+        // Non-blocking PostGIS Spatial Outbreak Synchronizer
+        const lat = parseFloat(req.body.lat) || (req.user && req.user.latitude) || null;
+        const lon = parseFloat(req.body.lon) || (req.user && req.user.longitude) || null;
+
+        if (lat && lon) {
+            recordSpatialReport({
+                farmerId: req.user ? req.user.id : null,
+                farmerName: req.user ? req.user.name : (req.body.farmerName || "Farmer"),
+                reportType: "pest",
+                crop: crop || "Crop",
+                disease: null,
+                pest: pestInfo.name,
+                severity: evalResult.severity || "Moderate",
+                confidence: detection.confidence || 0.88,
+                latitude: lat,
+                longitude: lon,
+                district: req.user ? req.user.district : (req.body.district || ""),
+                village: req.user ? req.user.village : (req.body.village || ""),
+                spray: pestInfo.chemicalControl || "N/A",
+                notes: `Pest trap scan. Trap count: ${trapCount}. ETL Exceeded: ${evalResult.isEtlExceeded ? "YES" : "NO"}.`
+            }).then(() => {
+                console.log(`   🗺️ [PostGIS] Recorded pest outbreak [${pestInfo.name}] at [${lat.toFixed(2)}, ${lon.toFixed(2)}]`);
+            }).catch(spErr => {
+                console.warn("   ⚠️ PostGIS pest sync notice:", spErr.message);
+            });
+        }
+
+        // ── Human-in-the-Loop Expert Validation Subsystem Synchronization ──
+        let enqueuedCaseRef = null;
+        const pestConfidence = detection.confidence || 0.65;
+        const confPercent = parseFloat((pestConfidence * 100).toFixed(1));
+        const shouldEnqueueExpert = pestConfidence < 0.75 || evalResult.isEtlExceeded || req.body.escalateToExpert === "true";
+
+        if (shouldEnqueueExpert) {
+            try {
+                const enqueued = await enqueueCase({
+                    category: "pest",
+                    crop: crop || "Tomato",
+                    aiDisease: `${pestInfo.name} (${pestInfo.scientificName || ""})`,
+                    aiConfidence: confPercent,
+                    aiSeverity: `${evalResult.severity} (Trap count: ${trapCount}, ETL: ${evalResult.isEtlExceeded ? "Exceeded" : "Normal"})`,
+                    aiStatus: pestConfidence < 0.75 ? "uncertain" : "confirmed",
+                    symptoms: pestInfo.symptoms || [`Pest infestation detected on ${crop}`],
+                    vlmEvidence: {
+                        pestId: pestInfo.id,
+                        trapCount,
+                        etlStatus: evalResult.severity,
+                        morphologySummary: `${pestInfo.name} scouting report. Trap count: ${trapCount}.`
+                    },
+                    imageUrl: imageUrl,
+                    imageName: path.basename(req.file.path),
+                    farmerId: req.user ? req.user.id : null,
+                    farmerName: farmerName,
+                    district: (req.user && req.user.district) || req.body.district || "Sangli",
+                    village: (req.user && req.user.village) || req.body.village || "Field",
+                    latitude: lat || 16.8524,
+                    longitude: lon || 74.5815
+                });
+                enqueuedCaseRef = enqueued.case_number;
+                console.log(`   👨‍🔬 [Expert Queue] Enqueued Pest Case [${enqueuedCaseRef}] for ${pestInfo.name} (${confPercent}%)`);
+            } catch (eqErr) {
+                console.warn("   ⚠️ Expert pest enqueue notice:", eqErr.message);
+            }
+        }
+
         return res.json({
             success: true,
             pest: {
@@ -148,6 +215,12 @@ router.post("/detect", optionalAuth, upload.single("image"), async (req, res) =>
                 biologicalControl: pestInfo.biologicalControl,
                 chemicalControl: pestInfo.chemicalControl,
                 prevention: pestInfo.prevention
+            },
+            expertValidation: {
+                enqueued: !!enqueuedCaseRef,
+                caseNumber: enqueuedCaseRef,
+                confidencePercent: confPercent,
+                isBorderline: pestConfidence < 0.75
             },
             logId: savedLog ? savedLog._id : null,
             imageUrl

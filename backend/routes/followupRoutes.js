@@ -14,7 +14,6 @@ const { optionalAuth } = require("../middleware/auth");
 const {
     getAllFollowupCases,
     getCaseTimeline,
-    scheduleFollowup,
     submitFollowupInspection
 } = require("../services/followupService");
 
@@ -62,32 +61,11 @@ router.get("/timeline/:caseRef", optionalAuth, async (req, res) => {
         const timeline = await getCaseTimeline(req.params.caseRef);
         res.json({
             success: true,
-            timeline
+            ...timeline
         });
     } catch (err) {
         console.error("Error fetching case timeline:", err);
         res.status(404).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * @route   POST /api/followup/schedule
- * @desc    Schedule a new follow-up milestone for an active case
- */
-router.post("/schedule", optionalAuth, async (req, res) => {
-    try {
-        const { caseRef, daysAhead } = req.body;
-        if (!caseRef) {
-            return res.status(400).json({ success: false, error: "caseRef is required" });
-        }
-        const followup = await scheduleFollowup(caseRef, daysAhead ? parseInt(daysAhead, 10) : 5);
-        res.status(201).json({
-            success: true,
-            followup
-        });
-    } catch (err) {
-        console.error("Error scheduling follow-up:", err);
-        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -97,7 +75,7 @@ router.post("/schedule", optionalAuth, async (req, res) => {
  */
 router.post("/submit", optionalAuth, upload.single("image"), async (req, res) => {
     try {
-        const { caseRef, followupId, farmerNotes } = req.body;
+        const { caseRef, dayOffset, notes, farmerNotes, treatmentFollowed } = req.body;
 
         if (!req.file) {
             return res.status(400).json({ success: false, error: "Follow-up photo is required" });
@@ -108,9 +86,10 @@ router.post("/submit", optionalAuth, upload.single("image"), async (req, res) =>
 
         const result = await submitFollowupInspection(
             caseRef,
-            followupId ? parseInt(followupId, 10) : null,
+            dayOffset ? parseInt(dayOffset, 10) : 5,
             req.file,
-            farmerNotes || ""
+            notes || farmerNotes || "",
+            treatmentFollowed
         );
 
         res.json(result);

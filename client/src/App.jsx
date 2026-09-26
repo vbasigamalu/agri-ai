@@ -65,6 +65,7 @@ export default function App() {
   const [mlExperiments, setMlExperiments] = useState([]);
   const [showMlModal, setShowMlModal] = useState(false);
   const [loadingMl, setLoadingMl] = useState(false);
+  const [activeFollowupCaseRef, setActiveFollowupCaseRef] = useState(null);
 
   // Fetch district alerts on mount
   useEffect(() => {
@@ -319,11 +320,14 @@ export default function App() {
               onScanCompleted={setLastScanLocation}
               onNavigateToMap={() => setTab("map")}
               onNavigateToExpert={() => setTab("expert")}
-              onNavigateToFollowup={() => setTab("followup")}
+              onNavigateToFollowup={(caseRef) => {
+                if (caseRef) setActiveFollowupCaseRef(caseRef);
+                setTab("followup");
+              }}
             />
           )}
           {tab === "followup" && (
-            <FollowupTab user={user} />
+            <FollowupTab user={user} initialCaseRef={activeFollowupCaseRef} />
           )}
           {tab === "map"      && (
             <OutbreakMapTab

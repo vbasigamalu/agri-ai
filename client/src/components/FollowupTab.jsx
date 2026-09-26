@@ -17,9 +17,9 @@ import {
 
 const API_BASE = "";
 
-export default function FollowupTab({ user }) {
+export default function FollowupTab({ user, initialCaseRef }) {
   const [cases, setCases] = useState([]);
-  const [selectedCaseRef, setSelectedCaseRef] = useState(null);
+  const [selectedCaseRef, setSelectedCaseRef] = useState(initialCaseRef || null);
   const [timelineData, setTimelineData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
@@ -39,6 +39,13 @@ export default function FollowupTab({ user }) {
 
   const fileInputRef = useRef(null);
 
+  // Sync initialCaseRef if passed from DiseaseTab
+  useEffect(() => {
+    if (initialCaseRef) {
+      setSelectedCaseRef(initialCaseRef);
+    }
+  }, [initialCaseRef]);
+
   // Fetch all cases
   const loadCases = async () => {
     try {
@@ -47,7 +54,7 @@ export default function FollowupTab({ user }) {
       if (!res.ok) throw new Error("Failed to load cases");
       const data = await res.json();
       setCases(data.cases || []);
-      if (data.cases?.length > 0 && !selectedCaseRef) {
+      if (data.cases?.length > 0 && !selectedCaseRef && !initialCaseRef) {
         setSelectedCaseRef(data.cases[0].case_ref);
       }
     } catch (err) {
@@ -531,9 +538,9 @@ export default function FollowupTab({ user }) {
                       </span>
                     </div>
                     <div style={{ height: "220px", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                      {timelineData.comparison?.day1?.imageUrl ? (
+                      {timelineData.comparison?.day1?.imageUrl || timelineData.case?.day1_image_url ? (
                         <img
-                          src={timelineData.comparison.day1.imageUrl.startsWith("http") ? timelineData.comparison.day1.imageUrl : `${API_BASE}${timelineData.comparison.day1.imageUrl}`}
+                          src={(timelineData.comparison?.day1?.imageUrl || timelineData.case?.day1_image_url).startsWith("http") ? (timelineData.comparison?.day1?.imageUrl || timelineData.case?.day1_image_url) : `${API_BASE}${timelineData.comparison?.day1?.imageUrl || timelineData.case?.day1_image_url}`}
                           alt="Day 1 Baseline"
                           style={{ width: "100%", height: "100%", objectFit: "contain" }}
                         />

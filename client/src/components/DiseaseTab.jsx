@@ -1446,7 +1446,7 @@ export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onN
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={onNavigateToFollowup}
+                      onClick={() => onNavigateToFollowup(result.caseRef)}
                       style={{
                         padding: "0.45rem 0.9rem",
                         fontSize: "0.82rem",
@@ -1459,7 +1459,7 @@ export default function DiseaseTab({ user, onScanCompleted, onNavigateToMap, onN
                       }}
                     >
                       <CalendarIcon size={14} color="#ffffff" />
-                      <span>Schedule Day 5 Follow-up</span>
+                      <span>{result.caseRef ? `Track Case ${result.caseRef} in Follow-up` : "Schedule Day 5 Follow-up"}</span>
                       <ArrowRightIcon size={12} color="#ffffff" />
                     </button>
                   )}

@@ -1,0 +1,23 @@
+{
+  "name": "agri-ai-workspace",
+  "version": "2.0.0",
+  "description": "Agri-AI — Smart Crop Health & Biosecurity Advisory Platform",
+  "private": true,
+  "scripts": {
+    "dev": "node start-dev.js",
+    "client": "npm --prefix client run dev",
+    "backend": "npm --prefix backend start",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix backend start"
+  },
+  "keywords": [
+    "agri-ai",
+    "crop-disease",
+    "pest-detection",
+    "postgis",
+    "react",
+    "vite"
+  ],
+  "author": "Agri-AI Team",
+  "license": "ISC"
+}

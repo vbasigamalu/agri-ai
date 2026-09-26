@@ -1,13 +1,18 @@
 @echo off
-title Agri-AI - Smart Crop Advisor
+setlocal EnableDelayedExpansion
+
+title Agri-AI - Smart Crop Health and Advisory Platform
 color 0A
 
 echo ===================================================
-echo             AGRI-AI SMART CROP ADVISOR             
+echo        AGRI-AI SMART CROP HEALTH ADVISOR           
 echo ===================================================
+echo [INFO] Starting Agri-AI Multi-Service Environment...
 echo.
 
-:: Check for Node.js installation
+set "ROOT_DIR=%~dp0"
+
+:: 1. Check for Node.js installation
 node -v >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     color 0C
@@ -18,48 +23,61 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-:: Navigate to backend directory
-cd /d "%~dp0backend"
-
-:: Check if node_modules exists, install if missing
-if not exist "node_modules\" (
-    echo [INFO] First time setup detected: Installing dependencies...
-    echo.
+:: 2. Check Backend dependencies
+if not exist "%ROOT_DIR%backend\node_modules\" (
+    echo [INFO] Installing Backend dependencies...
+    cd /d "%ROOT_DIR%backend"
     call npm install
     if %ERRORLEVEL% NEQ 0 (
         color 0C
-        echo [ERROR] Failed to install dependencies. Please check your internet connection.
-        echo.
+        echo [ERROR] Failed to install backend dependencies.
         pause
         exit /b 1
     )
-    echo [SUCCESS] Backend dependencies installed!
+    echo [SUCCESS] Backend dependencies ready!
     echo.
 )
 
-:: Check if client is built, build if missing
-if not exist "%~dp0client\dist\" (
-    echo [INFO] Building modern React frontend...
-    cd /d "%~dp0client"
-    if not exist "node_modules\" call npm install
+:: 3. Check Client dependencies
+if not exist "%ROOT_DIR%client\node_modules\" (
+    echo [INFO] Installing Frontend dependencies...
+    cd /d "%ROOT_DIR%client"
+    call npm install
+    if %ERRORLEVEL% NEQ 0 (
+        color 0C
+        echo [ERROR] Failed to install client dependencies.
+        pause
+        exit /b 1
+    )
+    echo [SUCCESS] Frontend dependencies ready!
+    echo.
+)
+
+:: 4. Ensure production build exists
+if not exist "%ROOT_DIR%client\dist\" (
+    echo [INFO] Building production bundle for client...
+    cd /d "%ROOT_DIR%client"
     call npm run build
-    cd /d "%~dp0backend"
-)
-
-:: Automatically open default browser to Agri-AI web app in 3 seconds
-start "" powershell -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:5000'"
-
-echo [INFO] Starting Agri-AI Server...
-echo [INFO] Web app will automatically open at http://localhost:5000
-echo ===================================================
-echo.
-
-:: Start Node.js application
-call npm start
-
-if %ERRORLEVEL% NEQ 0 (
-    color 0C
+    echo [SUCCESS] Client build ready!
     echo.
-    echo [ERROR] Agri-AI server stopped unexpectedly.
-    pause
 )
+
+echo ===================================================
+echo [1/2] Launching Backend API Service on Port 5000...
+start "Agri-AI Backend [5000]" cmd /k "cd /d "%ROOT_DIR%backend" && npm start"
+
+echo [2/2] Launching Frontend React App on Port 5173...
+start "Agri-AI Frontend [5173]" cmd /k "cd /d "%ROOT_DIR%client" && npm run dev"
+
+echo ===================================================
+echo [INFO] All services started successfully!
+echo   - Frontend React UI : http://localhost:5173
+echo   - Backend REST API  : http://localhost:5000
+echo.
+echo [INFO] Opening default browser in 3 seconds...
+start "" powershell -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:5173'"
+
+echo.
+echo Press any key to exit this launcher window.
+echo (The Backend and Frontend windows will stay running).
+pause >nul

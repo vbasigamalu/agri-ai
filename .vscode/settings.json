@@ -4,6 +4,7 @@
         "**/backend/**",
         "**/database.json",
         "**/.db/**"
-    ]
+    ],
+    "remote.autoForwardPorts": false
 }
 

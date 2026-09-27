@@ -51,14 +51,17 @@ export default function FollowupTab({ user, initialCaseRef }) {
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/api/followup/cases`);
-      if (!res.ok) throw new Error("Failed to load cases");
-      const data = await res.json();
-      setCases(data.cases || []);
-      if (data.cases?.length > 0 && !selectedCaseRef && !initialCaseRef) {
-        setSelectedCaseRef(data.cases[0].case_ref);
+      if (res.ok) {
+        const data = await res.json();
+        setCases(data.cases || []);
+        if (data.cases?.length > 0 && !selectedCaseRef && !initialCaseRef) {
+          setSelectedCaseRef(data.cases[0].case_ref);
+        }
+      } else {
+        setCases([]);
       }
     } catch (err) {
-      console.error("Error loading followup cases:", err);
+      console.warn("Could not load followup cases (offline mode active):", err.message || err);
     } finally {
       setLoading(false);
     }
@@ -70,11 +73,12 @@ export default function FollowupTab({ user, initialCaseRef }) {
     try {
       setLoadingTimeline(true);
       const res = await fetch(`${API_BASE}/api/followup/timeline/${caseRef}`);
-      if (!res.ok) throw new Error("Failed to load timeline");
-      const data = await res.json();
-      setTimelineData(data);
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineData(data);
+      }
     } catch (err) {
-      console.error("Error loading case timeline:", err);
+      console.warn("Could not load case timeline (offline mode):", err.message || err);
     } finally {
       setLoadingTimeline(false);
     }

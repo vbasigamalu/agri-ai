@@ -230,31 +230,37 @@ export default function OutbreakMapTab({ user, activeScan, onNavigateToExpert })
       const hotspotRes = await fetch(
         `${API}/api/spatial/hotspots?category=${categoryFilter}&days=45&lat=${farmerCoords.lat}&lon=${farmerCoords.lon}`
       );
-      const hotspotData = await hotspotRes.json();
-      if (hotspotData.success) {
-        setHotspots(hotspotData.hotspots || []);
-        setHotspotAnalytics(hotspotData.analytics || null);
+      if (hotspotRes.ok) {
+        const hotspotData = await hotspotRes.json();
+        if (hotspotData && hotspotData.success) {
+          setHotspots(hotspotData.hotspots || []);
+          setHotspotAnalytics(hotspotData.analytics || null);
+        }
       }
 
       // 2. Fetch Anonymized Nearby Field Reports (ST_DWithin)
       const nearbyRes = await fetch(
         `${API}/api/spatial/nearby?lat=${farmerCoords.lat}&lon=${farmerCoords.lon}&radiusKm=${radiusKm}&type=${categoryFilter}`
       );
-      const nearbyData = await nearbyRes.json();
-      if (nearbyData.success) {
-        setRawReports(nearbyData.reports || []);
+      if (nearbyRes.ok) {
+        const nearbyData = await nearbyRes.json();
+        if (nearbyData && nearbyData.success) {
+          setRawReports(nearbyData.reports || []);
+        }
       }
 
       // 3. Spatial Summary for Proximity Radar
       const summaryRes = await fetch(
         `${API}/api/spatial/summary?lat=${farmerCoords.lat}&lon=${farmerCoords.lon}&radiusKm=${radiusKm}`
       );
-      const summaryData = await summaryRes.json();
-      if (summaryData.success) {
-        setSpatialSummary(summaryData.summary);
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        if (summaryData && summaryData.success) {
+          setSpatialSummary(summaryData.summary);
+        }
       }
     } catch (err) {
-      console.warn("Could not fetch spatial hotspot data:", err);
+      console.warn("Could not fetch spatial hotspot data (using offline mode):", err.message || err);
     } finally {
       setLoading(false);
     }

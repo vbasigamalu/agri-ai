@@ -6,16 +6,30 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 
 const isWin = process.platform === 'win32';
 const npmCmd = isWin ? 'npm.cmd' : 'npm';
 
+function freePort(port) {
+  try {
+    if (isWin) {
+      execSync(`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore' });
+    } else {
+      execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+    }
+  } catch (e) {}
+}
+
 console.log('\x1b[32m%s\x1b[0m', '===================================================');
 console.log('\x1b[32m%s\x1b[0m', '        AGRI-AI SMART CROP HEALTH ADVISOR          ');
 console.log('\x1b[32m%s\x1b[0m', '      Starting Backend (5000) & React UI (5173)    ');
 console.log('\x1b[32m%s\x1b[0m', '===================================================\n');
+
+// Clean up any stale processes on our target ports
+freePort(5000);
+freePort(5173);
 
 // 1. Spawn Backend (Express on port 5000)
 const backend = spawn(npmCmd, ['start'], {
@@ -63,6 +77,8 @@ function shutdown() {
   console.log('\n\x1b[33m[Agri-AI] Shutting down backend and frontend dev servers...\x1b[0m');
   try { backend.kill(); } catch (e) {}
   try { client.kill(); } catch (e) {}
+  freePort(5000);
+  freePort(5173);
   process.exit(0);
 }
 

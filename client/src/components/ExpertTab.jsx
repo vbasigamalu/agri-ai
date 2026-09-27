@@ -87,21 +87,28 @@ export default function ExpertTab({ user, onNavigateToMap }) {
         fetch(`${API}/api/expert/stats`)
       ]);
 
-      const casesJson = await casesRes.json();
-      const statsJson = await statsRes.json();
+      let casesJson = null;
+      let statsJson = null;
 
-      if (casesJson.success) {
+      if (casesRes.ok) {
+        try { casesJson = await casesRes.json(); } catch {}
+      }
+      if (statsRes.ok) {
+        try { statsJson = await statsRes.json(); } catch {}
+      }
+
+      if (casesJson && casesJson.success) {
         let list = casesJson.cases || [];
         if (activeTab === "groundtruth") {
           list = list.filter((c) => c.is_ground_truth === true);
         }
         setCases(list);
       }
-      if (statsJson.success) {
+      if (statsJson && statsJson.success) {
         setStats(statsJson.stats);
       }
     } catch (err) {
-      console.warn("Could not load expert cases:", err);
+      console.warn("Could not load expert cases (offline fallback active):", err.message || err);
     } finally {
       setLoading(false);
     }

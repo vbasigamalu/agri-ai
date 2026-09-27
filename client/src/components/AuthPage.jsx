@@ -15,14 +15,25 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
 
   function loginOffline() {
     const enteredId = form.identifier.trim();
-    const fallbackName = form.name.trim() || (enteredId.includes("@") ? enteredId.split("@")[0] : enteredId) || "Farmer";
+    let fallbackName = form.name.trim();
+    let fallbackDistrict = form.district || "Maharashtra";
+    let fallbackVillage = form.village || "";
+
+    if (enteredId === "9112959475") {
+      fallbackName = fallbackName || "Vishnukant Basigamalu";
+      fallbackDistrict = "nanded";
+      fallbackVillage = "kothala";
+    } else if (!fallbackName) {
+      fallbackName = (enteredId.includes("@") ? enteredId.split("@")[0] : enteredId) || "Farmer";
+    }
+
     const offlineUser = {
       id: "offline_" + Date.now(),
       name: fallbackName,
       phone_or_email: enteredId || "farmer@agri-ai.local",
-      location: form.district || "Maharashtra",
-      district: form.district || "Maharashtra",
-      village: form.village || "",
+      location: fallbackDistrict,
+      district: fallbackDistrict,
+      village: fallbackVillage,
       role: form.role || "farmer",
       token: "offline_demo_token_" + Date.now(),
       isOffline: true
@@ -70,21 +81,15 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
         localStorage.setItem("agri_user", JSON.stringify(userData));
         localStorage.setItem("agri_ai_user", JSON.stringify(d.user || userData));
         onLogin(userData);
-      } else if (r.status === 404) {
-        setMsg({ 
-          text: "Backend API endpoint not found (404). The deployed server may be outdated or still syncing. You can continue immediately in Offline Mode:", 
-          type: "error",
-          allowOffline: true 
-        });
+      } else if (r.status === 404 || r.status === 502 || r.status === 503 || d.offline) {
+        // Backend unavailable/offline - log in immediately via resilient fallback
+        loginOffline();
       } else {
         setMsg({ text: d.error || d.message || "Invalid Phone/Email or Password.", type: "error" });
       }
     } catch {
-      setMsg({ 
-        text: "Network error: Unable to reach backend server. You can continue immediately in Offline Mode:", 
-        type: "error",
-        allowOffline: true 
-      });
+      // Network unreachable - log in immediately
+      loginOffline();
     } finally { setLoading(false); }
   }
 
@@ -134,21 +139,13 @@ export default function AuthPage({ onLogin, onBackToLanding }) {
           setMsg({ text: d.message || "Account created! Please log in.", type: "success" });
           setTab("login");
         }
-      } else if (r.status === 404) {
-        setMsg({ 
-          text: "Registration endpoint not found on server (404). You can continue immediately in Offline Mode:", 
-          type: "error",
-          allowOffline: true 
-        });
+      } else if (r.status === 404 || r.status === 502 || r.status === 503 || d.offline) {
+        loginOffline();
       } else {
         setMsg({ text: d.error || d.message || "Registration failed", type: "error" });
       }
     } catch {
-      setMsg({ 
-        text: "Network error: Unable to reach backend server. You can continue immediately in Offline Mode:", 
-        type: "error",
-        allowOffline: true 
-      });
+      loginOffline();
     } finally { setLoading(false); }
   }
 

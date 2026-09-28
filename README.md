@@ -1,7 +1,7 @@
 # Agri-AI — Smart Crop Advisor Platform
 
 > # 🌐 LIVE DEMO LINK (JURY REVIEW):
-> # 🚀 **[👉 https://agri-ai-red.vercel.app/ 👈](https://agri-ai-red.vercel.app/)**
+> # **[👉 https://agri-ai-red.vercel.app/ 👈](https://agri-ai-red.vercel.app/)**
 > 
 > [![Live Demo](https://img.shields.io/badge/LIVE%20PROJECT-CLICK%20TO%20OPEN%20WEBSITE-2ea44f?style=for-the-badge&logo=vercel&logoColor=white)](https://agri-ai-red.vercel.app/)
 

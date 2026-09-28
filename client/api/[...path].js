@@ -141,6 +141,51 @@ export default function handler(req, res) {
     });
   }
 
+  if (url.includes("/followup/submit")) {
+    return res.status(200).json({
+      success: true,
+      caseRef: "CASE-2026-089",
+      progression: {
+        status: "improving",
+        severityDelta: -24,
+        explanation: "Positive Recovery: Foliar lesion surface area reduced by 24% (from 42% to 18%). CIB&RC spray suppressed fungal spore expansion.",
+        day1: {
+          imageUrl: "https://images.unsplash.com/photo-1592417817098-8f3d6eb22657?w=600&auto=format&fit=crop&q=80",
+          severityPct: 42,
+          condition: "Tomato Early Blight",
+          confidence: 0.94
+        },
+        latest: {
+          imageUrl: "https://images.unsplash.com/photo-1598512752271-33f913a5af13?w=600&auto=format&fit=crop&q=80",
+          severityPct: 18,
+          dayOffset: 5,
+          inspectedAt: new Date().toISOString(),
+          condition: "Tomato Early Blight (Healing Lesions)"
+        }
+      },
+      timeline: [
+        {
+          type: "initial_diagnosis",
+          title: "Day 1: Initial Diagnosis",
+          date: new Date(Date.now() - 6 * 86400000).toISOString(),
+          description: "Vision AI detected 42% lesion coverage. Standard treatment protocol prescribed."
+        },
+        {
+          type: "treatment_applied",
+          title: "Day 2: Chemical Foliar Application",
+          date: new Date(Date.now() - 5 * 86400000).toISOString(),
+          description: "Farmer confirmed foliar spray applied under favorable weather window."
+        },
+        {
+          type: "followup_inspection",
+          title: "Day 5: Re-inspection Foliage Scan",
+          date: new Date().toISOString(),
+          description: "Foliage photo analyzed. Lesion necrosis shrank from 42% to 18% (-24% shift). Verdict: IMPROVING."
+        }
+      ]
+    });
+  }
+
   if (url.includes("/followup/cases")) {
     return res.status(200).json({
       success: true,

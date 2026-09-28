@@ -10,22 +10,18 @@
     },
     {
       "source": "/history",
-      "destination": "https://agri-ai-backend.onrender.com/history"
+      "destination": "/api/history"
     },
     {
       "source": "/status",
-      "destination": "https://agri-ai-backend.onrender.com/status"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "https://agri-ai-backend.onrender.com/api/$1"
+      "destination": "/api/status"
     },
     {
       "source": "/uploads/(.*)",
       "destination": "https://agri-ai-backend.onrender.com/uploads/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

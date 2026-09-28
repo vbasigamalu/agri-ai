@@ -1,12 +1,20 @@
 # Agri-AI — Smart Crop Advisor Platform
 
+> # 🌐 LIVE DEMO LINK (JURY REVIEW):
+> # 🚀 **[👉 https://agri-ai-red.vercel.app/ 👈](https://agri-ai-red.vercel.app/)**
+> 
+> [![Live Demo](https://img.shields.io/badge/LIVE%20PROJECT-CLICK%20TO%20OPEN%20WEBSITE-2ea44f?style=for-the-badge&logo=vercel&logoColor=white)](https://agri-ai-red.vercel.app/)
+
+---
+
 Agri-AI is a high-performance, full-stack web application designed to help farmers detect crop diseases using local ML, receive personalized agricultural advisory via AI chat, and evaluate real-time weather-informed spray safety.
 
 ---
 
 ## 🛠️ Project Structure
-*   **/backend**: Node.js/Express server containing the local TensorFlow.js classifier, Groq AI chat engine, and MongoDB connection.
-*   **/frontend**: HTML, CSS, and vanilla JS client files served statically by the backend.
+*   **/client**: Modern React (Vite) frontend application with interactive GIS outbreak mapping, disease detection camera UI, follow-up timelines, and multilingual support.
+*   **/backend**: Node.js/Express REST API server containing local TensorFlow.js ML disease/pest classifiers, Groq AI chat engine, PostgreSQL database, and cloud storage.
+*   **/frontend**: Legacy static HTML/CSS/JS client (fallback).
 
 ---
 

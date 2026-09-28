@@ -162,6 +162,59 @@ export function setupApiInterceptor() {
         const found = FALLBACK_CASES.find((c) => c.case_ref === caseRef) || FALLBACK_CASES[0];
         return createJsonResponse({
           success: true,
+          case: {
+            case_ref: found.case_ref,
+            crop: found.crop,
+            location_district: found.district || "Sangli",
+            initial_condition: found.initial_condition,
+            initial_severity_pct: found.initial_severity_pct,
+            initial_confidence: found.initial_confidence,
+            opened_at: found.opened_at,
+            next_followup_date: found.next_followup_date,
+            status: found.status,
+            farmer_name: found.farmer_name,
+            day1_image_url: found.day1_image_url,
+            day5_image_url: found.day5_image_url
+          },
+          comparison: found.comparison,
+          treatments: [
+            {
+              chemical_name: "Mancozeb 75% WP (Indofil M-45)",
+              dosage: "2.5 g / Liter water",
+              treatment_type: "chemical",
+              application_date: new Date(Date.now() - 5 * 86400000).toISOString()
+            },
+            {
+              chemical_name: "Trichoderma viride Bio-fungicide",
+              dosage: "5 g / Liter water",
+              treatment_type: "biological",
+              application_date: new Date(Date.now() - 2 * 86400000).toISOString()
+            }
+          ],
+          timeline: [
+            {
+              type: "initial_diagnosis",
+              title: "Day 1: Initial Diagnosis",
+              date: found.opened_at,
+              description: `Vision AI detected ${found.initial_severity_pct}% lesion coverage. Standard treatment protocol prescribed.`
+            },
+            {
+              type: "treatment_applied",
+              title: "Day 2: Chemical Foliar Application",
+              date: new Date(Date.now() - 5 * 86400000).toISOString(),
+              description: "Farmer confirmed foliar spray applied under favorable weather window."
+            },
+            ...(found.day5_image_url
+              ? [
+                  {
+                    type: "followup_inspection",
+                    title: "Day 5: Re-inspection Foliage Scan",
+                    date: found.next_followup_date,
+                    description: "Foliage photo uploaded. Lesion necrosis shrank from 42% to 18% (-24% shift). Verdict: IMPROVING."
+                  }
+                ]
+              : [])
+          ],
           caseRef: found.case_ref,
           crop: found.crop,
           status: found.comparison ? found.comparison.status : "in_progress",

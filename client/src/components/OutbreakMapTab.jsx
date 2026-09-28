@@ -426,8 +426,8 @@ export default function OutbreakMapTab({ user, activeScan, onNavigateToExpert })
             ${hs.conditionName}
           </h3>
           <div style="color: #64748b; font-size: 12px; margin-bottom: 8px;">
-            Affected Crop: <strong style="color: #1e293b;">${hs.crop}</strong> · 
-            <span>${hs.affectedVillages.slice(0, 3).join(", ") || "Cluster Region"}</span>
+            Affected Crop: <strong style="color: #1e293b;">${hs.crop || "Crop"}</strong> · 
+            <span>${(hs.affectedVillages || []).slice(0, 3).join(", ") || "Cluster Region"}</span>
           </div>
 
           <!-- Hotspot Metrics Grid -->
@@ -1081,16 +1081,16 @@ export default function OutbreakMapTab({ user, activeScan, onNavigateToExpert })
                       </div>
 
                       <div style={{ fontSize: "0.78rem", color: "#64748b", marginBottom: "6px" }}>
-                        Crop: <strong>{hs.crop}</strong> · {hs.affectedVillages.slice(0, 2).join(", ") || "Cluster Zone"}
+                        Crop: <strong>{hs.crop || "Crop"}</strong> · {(hs.affectedVillages || []).slice(0, 2).join(", ") || "Cluster Zone"}
                       </div>
 
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.74rem" }}>
                         <span style={{ color: "#334155", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                           <FlameIcon size={12} color="#dc2626" />
-                          <span>{hs.totalCases} Reports ({hs.radiusKm}km radius)</span>
+                          <span>{hs.totalCases || 1} Reports ({hs.radiusKm || 5}km radius)</span>
                         </span>
-                        <span style={{ color: hs.trend.includes("Surging") ? "#dc2626" : "#475569", fontWeight: 700 }}>
-                          {hs.trend}
+                        <span style={{ color: (hs.trend || "").includes("Surging") ? "#dc2626" : "#475569", fontWeight: 700 }}>
+                          {hs.trend || "Active ➡️"}
                         </span>
                       </div>
 
